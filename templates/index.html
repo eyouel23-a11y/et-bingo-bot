@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>አማርኛ ቢንጎ</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --card-bg: #e0f7fa;
+      --accent: #2ecc71;
+      --accent-text: #fff;
+      --header-bg: #0088cc;
+      --header-text: #fff;
+      --free-bg: #ffd700;
+      --free-text: #333;
+      --border: #b2ebf2;
+      --shadow: 0 4px 20px rgba(0,0,0,0.15);
+      --radius: 12px;
+    }
+
+    html, body {
+      height: 100%;
+      background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: #111;
+      overflow-x: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px 8px 24px;
+      gap: 14px;
+    }
+
+    /* ── Title ── */
+    .title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--header-bg);
+      letter-spacing: 1px;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.6);
+    }
+
+    /* ── Caller Box ── */
+    .caller-wrap {
+      width: 100%;
+      max-width: 380px;
+      background: var(--header-bg);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      box-shadow: var(--shadow);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .caller-label {
+      font-size: 0.75rem;
+      letter-spacing: 2px;
+      color: rgba(255,255,255,0.7);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .caller-number {
+      font-size: 2.8rem;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1;
+      min-height: 3.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.15s ease;
+    }
+
+    .caller-number .letter {
+      background: rgba(255,255,255,0.2);
+      border-radius: 8px;
+      padding: 2px 10px;
+      font-size: 2rem;
+    }
+
+    @keyframes popIn {
+      0%   { transform: scale(0.5); opacity: 0; }
+      70%  { transform: scale(1.12); opacity: 1; }
+      100% { transform: scale(1); }
+    }
+
+    .pop { animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+    .caller-history {
+      margin-top: 10px;
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.6);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .caller-history span {
+      margin: 0 3px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+    }
+
+    .btn:active { transform: scale(0.96); box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+
+    .btn-start  { background: var(--accent); color: #fff; }
+    .btn-stop   { background: #e74c3c; color: #fff; }
+    .btn-new    { background: #f39c12; color: #fff; }
+
+    /* ── Speed Slider ── */
+    .speed-wrap {
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: #555;
+    }
+
+    .speed-wrap input[type=range] {
+      flex: 1;
+      accent-color: var(--header-bg);
+    }
+
+    /* ── Bingo Card ── */
+    .card-wrap {
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .bingo-header {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+      margin-bottom: 5px;
+    }
+
+    .bingo-header div {
+      background: var(--header-bg);
+      color: #fff;
+      font-weight: 900;
+      font-size: 1.2rem;
+      text-align: center;
+      padding: 8px 0;
+      border-radius: 8px;
+      letter-spacing: 1px;
+    }
+
+    .bingo-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+    }
+
+    .cell {
+      background: var(--card-bg);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(0.85rem, 4vw, 1.1rem);
+      font-weight: 700;
+      color: #111;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.15s;
+      position: relative;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+
+    .cell:active { transform: scale(0.92); }
+
+    .cell.marked {
+      background: var(--accent);
+      color: var(--accent-text);
+      border-color: #27ae60;
+      box-shadow: 0 2px 10px rgba(46,204,113,0.4);
+    }
+
+    .cell.free {
+      background: var(--free-bg);
+      color: var(--free-text);
+      border-color: #f0c000;
+      cursor: default;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .cell.called-flash {
+      animation: flashCell 0.5s ease;
+    }
+
+    @keyframes flashCell {
+      0%   { box-shadow: 0 0 0 0 rgba(0,136,204,0.7); }
+      50%  { box-shadow: 0 0 0 10px rgba(0,136,204,0); }
+      100% { box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+    }
+
+    .cell.marked.called-flash {
+      animation: flashCellGreen 0.5s ease;
+    }
+
+    @keyframes flashCellGreen {
+      0%   { box-shadow: 0 0 0 0 rgba(46,204,113,0.8); }
+      50%  { box-shadow: 0 0 0 12px rgba(46,204,113,0); }
+      100% { box-shadow: 0 2px 10px rgba(46,204,113,0.4); }
+    }
+
+    /* ── Status Banner ── */
+    .status {
+      width: 100%;
+      max-width: 380px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      background: rgba(255,255,255,0.6);
+      color: #444;
+      backdrop-filter: blur(4px);
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── BINGO Overlay ── */
+    .bingo-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bingo-overlay.show { display: flex; }
+
+    .bingo-box {
+      background: #fff;
+      border-radius: 20px;
+      padding: 36px 32px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+      animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+      max-width: 300px;
+      width: 90%;
+    }
+
+    .bingo-emoji { font-size: 3.5rem; }
+    .bingo-box h2 { font-size: 2rem; color: var(--accent); margin: 8px 0 4px; font-weight: 900; }
+    .bingo-box p  { color: #666; font-size: 0.9rem; margin-bottom: 20px; }
+
+    .btn-play-again {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 28px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(46,204,113,0.4);
+    }
+
+    /* ── Called numbers count pill ── */
+    .count-pill {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.8);
+      margin-top: 6px;
+    }
+
+    @media (min-width: 420px) {
+      .cell { font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="title">🎲 አማርኛ ቢንጎ</div>
+
+  <!-- Caller display -->
+  <div class="caller-wrap">
+    <div class="caller-label">Called Number / የተጠራ ቁጥር</div>
+    <div class="caller-number" id="callerDisplay">
+      <span>—</span>
+    </div>
+    <div class="count-pill" id="countPill">0 / 75 ተጠርተዋል</div>
+    <div class="caller-history" id="callerHistory"></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-start" id="btnStart" onclick="startGame()">▶ ጀምር</button>
+    <button class="btn btn-stop"  id="btnStop"  onclick="stopGame()" disabled>⏸ አቁም</button>
+    <button class="btn btn-new"   onclick="newCard()">🔄 አዲስ</button>
+  </div>
+
+  <!-- Speed -->
+  <div class="speed-wrap">
+    <span>🐢</span>
+    <input type="range" id="speedRange" min="2" max="10" value="5" step="1" />
+    <span>🐇</span>
+    <span id="speedLabel" style="min-width:32px;text-align:right">5s</span>
+  </div>
+
+  <!-- Bingo Card -->
+  <div class="card-wrap">
+    <div class="bingo-header">
+      <div>B</div><div>I</div><div>N</div><div>G</div><div>O</div>
+    </div>
+    <div class="bingo-grid" id="bingoGrid"></div>
+  </div>
+
+  <!-- Status -->
+  <div class="status" id="statusMsg">አዲስ ካርድ ተፈጠረ። ▶ ጀምር ን ተጫን!</div>
+
+  <!-- BINGO overlay -->
+  <div class="bingo-overlay" id="bingoOverlay">
+    <div class="bingo-box">
+      <div class="bingo-emoji">🏆</div>
+      <h2>BINGO!</h2>
+      <p>እንኳን ደስ አለዎት! አሸነፉ!</p>
+      <button class="btn-play-again" onclick="newCard(); closeBingo()">🔄 እንደ ገና ጫወት</button>
+    </div>
+  </div>
+
+<script>
+  // ── Telegram WebApp init ──
+  if (window.Telegram && window.Telegram.WebApp) {
+    Telegram.WebApp.ready();
+    Telegram.WebApp.expand();
+  }
+
+  // ── State ──
+  let card       = [];   // 5x5 grid values
+  let marked     = new Set();
+  let calledNums = [];
+  let allNumbers = [];
+  let callerTimer = null;
+  let isRunning  = false;
+  let callIndex  = 0;
+
+  const LETTERS = { B:1, I:2, N:3, G:4, O:5 };
+  const COLS    = ['B','I','N','G','O'];
+  const AM_LETTERS = { B:'ቢ', I:'አይ', N:'ኤን', G:'ጂ', O:'ኦ' };
+
+  // ── Speed control ──
+  const speedRange = document.getElementById('speedRange');
+  const speedLabel = document.getElementById('speedLabel');
+  speedRange.addEventListener('input', () => {
+    const s = parseInt(speedRange.value);
+    speedLabel.textContent = s + 's';
+    if (isRunning) { stopCaller(); startCaller(); }
+  });
+
+  function getInterval() {
+    return (11 - parseInt(speedRange.value)) * 1000; // 2s-10s
+  }
+
+  // ── Card generation ──
+  function generateCard() {
+    const ranges = [
+      [1,15],[16,30],[31,45],[46,60],[61,75]
+    ];
+    const cols = ranges.map(([lo,hi]) => shuffle(range(lo,hi)).slice(0,5));
+    cols[2][2] = 'FREE'; // center free space
+    const grid = [];
+    for (let r = 0; r < 5; r++) {
+      const row = [];
+      for (let c = 0; c < 5; c++) row.push(cols[c][r]);
+      grid.push(row);
+    }
+    return grid;
+  }
+
+  function range(lo, hi) {
+    const arr = [];
+    for (let i = lo; i <= hi; i++) arr.push(i);
+    return arr;
+  }
+
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // ── Render card ──
+  function renderCard() {
+    const grid = document.getElementById('bingoGrid');
+    grid.innerHTML = '';
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        const val = card[r][c];
+        const key = `${r}_${c}`;
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.id = `cell_${key}`;
+
+        if (val === 'FREE') {
+          cell.classList.add('free', 'marked');
+          cell.textContent = '⭐ FREE';
+        } else {
+          cell.textContent = val;
+          if (marked.has(key)) cell.classList.add('marked');
+          cell.addEventListener('click', () => toggleMark(r, c));
+        }
+        grid.appendChild(cell);
+      }
+    }
+  }
+
+  function toggleMark(r, c) {
+    const key = `${r}_${c}`;
+    const val = card[r][c];
+    if (val === 'FREE') return;
+    if (marked.has(key)) {
+      marked.delete(key);
+    } else {
+      marked.add(key);
+    }
+    const cell = document.getElementById(`cell_${key}`);
+    cell.classList.toggle('marked', marked.has(key));
+
+    if (checkBingo()) showBingo();
+  }
+
+  // ── Number calling ──
+  function buildCallOrder() {
+    allNumbers = shuffle(range(1, 75));
+    callIndex  = 0;
+  }
+
+  function getLetterForNum(n) {
+    if (n <= 15) return 'B';
+    if (n <= 30) return 'I';
+    if (n <= 45) return 'N';
+    if (n <= 60) return 'G';
+    return 'O';
+  }
+
+  function callNext() {
+    if (callIndex >= allNumbers.length) {
+      stopGame();
+      setStatus('ሁሉም ቁጥሮች ተጠርተዋል! ጨዋታው አለቀ።');
+      return;
+    }
+    const num  = allNumbers[callIndex++];
+    const col  = getLetterForNum(num);
+    calledNums.push(num);
+
+    updateCallerDisplay(col, num);
+    highlightCalledCells(num);
+    speakAmharic(col, num);
+    updateCountPill();
+    updateHistory();
+  }
+
+  function updateCallerDisplay(col, num) {
+    const el = document.getElementById('callerDisplay');
+    el.innerHTML = `<span class="letter">${col}</span><span>${num}</span>`;
+    el.classList.remove('pop');
+    void el.offsetWidth; // reflow to restart animation
+    el.classList.add('pop');
+  }
+
+  function highlightCalledCells(num) {
+    // Flash any cell on the card that matches
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        if (card[r][c] === num) {
+          const cell = document.getElementById(`cell_${r}_${c}`);
+          if (cell) {
+            cell.classList.remove('called-flash');
+            void cell.offsetWidth;
+            cell.classList.add('called-flash');
+          }
+        }
+      }
+    }
+  }
+
+  function updateCountPill() {
+    document.getElementById('countPill').textContent =
+      `${calledNums.length} / 75 ተጠርተዋል`;
+  }
+
+  function updateHistory() {
+    const hist = document.getElementById('callerHistory');
+    const recent = calledNums.slice(-8).reverse().map(n => {
+      const l = getLetterForNum(n);
+      return `<span>${l}${n}</span>`;
+    });
+    hist.innerHTML = recent.join('');
+  }
+
+  // ── TTS ──
+  let voices = [];
+  if ('speechSynthesis' in window) {
+    const loadVoices = () => { voices = window.speechSynthesis.getVoices(); };
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+  }
+
+  function speakAmharic(col, num) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+
+    const amLetter = AM_LETTERS[col];
+    const text = `${amLetter} ${num}`;
+
+    const utt = new SpeechSynthesisUtterance(text);
+
+    // Try to find an Amharic voice first
+    const amVoice = voices.find(v => v.lang.startsWith('am'));
+    if (amVoice) {
+      utt.voice = amVoice;
+      utt.lang  = 'am-ET';
+    } else {
+      // Fallback: speak the English letter + number clearly
+      const enText = `${col} ${num}`;
+      const fallback = new SpeechSynthesisUtterance(enText);
+      fallback.lang = 'en-US';
+      fallback.rate = 0.85;
+      fallback.pitch = 1;
+      window.speechSynthesis.speak(fallback);
+      return;
+    }
+
+    utt.rate  = 0.85;
+    utt.pitch = 1;
+    window.speechSynthesis.speak(utt);
+  }
+
+  // ── Bingo check ──
+  function checkBingo() {
+    // Rows
+    for (let r = 0; r < 5; r++) {
+      if ([0,1,2,3,4].every(c => marked.has(`${r}_${c}`))) return true;
+    }
+    // Columns
+    for (let c = 0; c < 5; c++) {
+      if ([0,1,2,3,4].every(r => marked.has(`${r}_${c}`))) return true;
+    }
+    // Diagonals
+    if ([0,1,2,3,4].every(i => marked.has(`${i}_${i}`))) return true;
+    if ([0,1,2,3,4].every(i => marked.has(`${i}_${4-i}`))) return true;
+    return false;
+  }
+
+  function showBingo() {
+    stopGame();
+    document.getElementById('bingoOverlay').classList.add('show');
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance('ቢንጎ! እንኳን ደስ አለዎት!');
+      utt.lang = 'am-ET';
+      window.speechSynthesis.speak(utt);
+    }
+  }
+
+  function closeBingo() {
+    document.getElementById('bingoOverlay').classList.remove('show');
+  }
+
+  // ── Game controls ──
+  function startGame() {
+    if (isRunning) return;
+    isRunning = true;
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled  = false;
+    setStatus('ቁጥሮች እየተጠሩ ነው…');
+    startCaller();
+  }
+
+  function stopGame() {
+    isRunning = false;
+    stopCaller();
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStop').disabled  = true;
+    if (calledNums.length > 0 && calledNums.length < 75)
+      setStatus(`ቆሟል — ${calledNums.length} ቁጥሮች ተጠርተዋል። ▶ ለመቀጠል ጀምር ን ተጫን።`);
+  }
+
+  function startCaller() {
+    callNext();
+    callerTimer = setInterval(callNext, getInterval());
+  }
+
+  function stopCaller() {
+    if (callerTimer) { clearInterval(callerTimer); callerTimer = null; }
+  }
+
+  function newCard() {
+    stopGame();
+    card       = generateCard();
+    marked     = new Set(['2_2']); // FREE cell
+    calledNums = [];
+    callIndex  = 0;
+    buildCallOrder();
+    renderCard();
+    document.getElementById('callerDisplay').innerHTML = '<span>—</span>';
+    document.getElementById('callerHistory').innerHTML = '';
+    updateCountPill();
+    setStatus('አዲስ ካርድ ተፈጠረ። ▶ ጀምር ን ተጫን!');
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  }
+
+  function setStatus(msg) {
+    document.getElementById('statusMsg').textContent = msg;
+  }
+
+  // ── Init ──
+  newCard();
+</script>
+</body>
+</html>
