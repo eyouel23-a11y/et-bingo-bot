@@ -1,661 +1,547 @@
 <!DOCTYPE html>
 <html lang="am">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>አማርኛ ቢንጎ</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ET Bingo Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: sans-serif; user-select: none; }
+        body { background: #121212; color: #fff; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
 
-    :root {
-      --card-bg: #e0f7fa;
-      --accent: #2ecc71;
-      --accent-text: #fff;
-      --header-bg: #0088cc;
-      --header-text: #fff;
-      --free-bg: #ffd700;
-      --free-text: #333;
-      --border: #b2ebf2;
-      --shadow: 0 4px 20px rgba(0,0,0,0.15);
-      --radius: 12px;
-    }
+        /* ── Auth ── */
+        .auth-card { background: #1e1e1e; padding: 20px; border-radius: 12px; border: 1px solid #333; width: 100%; max-width: 400px; text-align: center; margin-top: 20px; }
+        .btn { background: #27ae60; color: white; border: none; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 10px; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 6px; border: 1px solid #555; background: #222; color: #fff; text-align: center; font-size: 16px; }
+        .error-alert { color: #e74c3c; font-weight: bold; margin-top: 10px; font-size: 14px; }
 
-    html, body {
-      height: 100%;
-      background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      color: #111;
-      overflow-x: hidden;
-    }
+        /* ── Game container ── */
+        .game-container { display: none; width: 100%; max-width: 400px; }
 
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      padding: 12px 8px 24px;
-      gap: 14px;
-    }
+        /* ── Top header row ── */
+        .header { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .title { font-size: 18px; font-weight: bold; color: #80deea; }
+        .bal-display { background: #27ae60; padding: 4px 10px; border-radius: 15px; font-size: 13px; font-weight: bold; }
 
-    /* ── Title ── */
-    .title {
-      font-size: 1.6rem;
-      font-weight: 800;
-      color: var(--header-bg);
-      letter-spacing: 1px;
-      text-shadow: 0 1px 0 rgba(255,255,255,0.6);
-    }
+        /* ── Caller box ── */
+        .caller-box { background: #1e1e1e; width: 100%; border-radius: 12px; padding: 10px; text-align: center; margin-bottom: 10px; border: 1px solid #333; }
+        .caller-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .caller-label { font-size: 11px; color: #aaa; }
 
-    /* ── Caller Box ── */
-    .caller-wrap {
-      width: 100%;
-      max-width: 380px;
-      background: var(--header-bg);
-      border-radius: var(--radius);
-      padding: 16px 20px;
-      box-shadow: var(--shadow);
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
+        /* ── Mute button (lives near caller header) ── */
+        .mute-btn {
+            display: flex; align-items: center; gap: 5px;
+            background: #2d2d2d; border: 1.5px solid #555;
+            color: #fff; padding: 5px 11px; border-radius: 20px;
+            cursor: pointer; font-size: 12px; font-weight: bold;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .mute-btn.unmuted { background: #1a3a2a; border-color: #2ecc71; color: #2ecc71; }
+        .mute-btn.muted   { background: #3a1a1a; border-color: #e74c3c; color: #e74c3c; }
 
-    .caller-label {
-      font-size: 0.75rem;
-      letter-spacing: 2px;
-      color: rgba(255,255,255,0.7);
-      text-transform: uppercase;
-      margin-bottom: 6px;
-    }
+        .current-number { font-size: 44px; font-weight: bold; color: #2ecc71; margin: 2px 0; min-height: 52px; letter-spacing: 2px; }
 
-    .caller-number {
-      font-size: 2.8rem;
-      font-weight: 900;
-      color: #fff;
-      line-height: 1;
-      min-height: 3.2rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      transition: all 0.15s ease;
-    }
+        /* ── History strip ── */
+        .history-section { margin-bottom: 4px; }
+        .history-label { font-size: 10px; color: #666; text-align: left; margin-bottom: 3px; padding-left: 4px; }
+        .history-container {
+            display: flex; gap: 5px; overflow-x: auto; padding: 5px 6px;
+            background: #0a0a0a; border-radius: 25px; border: 1px solid #333;
+            min-height: 42px; align-items: center; scroll-behavior: smooth;
+        }
+        .history-container::-webkit-scrollbar { height: 0; }
+        .bingo-ball {
+            width: 34px; height: 34px; flex-shrink: 0;
+            border-radius: 50%; display: inline-flex; justify-content: center; align-items: center;
+            font-size: 10px; font-weight: bold; color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,.5);
+        }
+        .ball-B { background: radial-gradient(circle at 35% 35%, #42a5f5, #1565c0); }
+        .ball-I { background: radial-gradient(circle at 35% 35%, #ef5350, #b71c1c); }
+        .ball-N { background: radial-gradient(circle at 35% 35%, #66bb6a, #1b5e20); }
+        .ball-G { background: radial-gradient(circle at 35% 35%, #ffa726, #e65100); }
+        .ball-O { background: radial-gradient(circle at 35% 35%, #ab47bc, #4a148c); }
+        .history-empty { font-size: 11px; color: #444; margin: 0 auto; }
 
-    .caller-number .letter {
-      background: rgba(255,255,255,0.2);
-      border-radius: 8px;
-      padding: 2px 10px;
-      font-size: 2rem;
-    }
+        /* ── Bingo card ── */
+        .bingo-card { width: 100%; background: #e0f7fa; border-radius: 12px; padding: 8px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .header-cell { background: #00838f; color: white; font-weight: bold; font-size: 18px; display: flex; justify-content: center; align-items: center; height: 36px; border-radius: 6px; }
+        .cell { background: #fff; color: #000; font-weight: bold; font-size: 18px; display: flex; justify-content: center; align-items: center; height: 46px; border-radius: 6px; cursor: pointer; border: 1px solid #b2ebf2; transition: background 0.15s; }
+        .cell.selected { background: #2ecc71 !important; color: #fff !important; }
+        .cell.free { background: #ffe082; color: #d84315; font-size: 11px; }
+        .cell.uncallable { background: #f5f5f5 !important; color: #bbb !important; cursor: not-allowed; }
 
-    @keyframes popIn {
-      0%   { transform: scale(0.5); opacity: 0; }
-      70%  { transform: scale(1.12); opacity: 1; }
-      100% { transform: scale(1); }
-    }
+        /* ── BINGO claim button ── */
+        .bingo-btn {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: white; border: none; padding: 14px; border-radius: 10px;
+            font-size: 20px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px;
+            box-shadow: 0 4px 12px rgba(255,152,0,.4);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .bingo-btn:active { transform: scale(0.97); box-shadow: 0 2px 6px rgba(255,152,0,.3); }
+        .bingo-btn:disabled { background: #555; box-shadow: none; cursor: not-allowed; color: #999; }
 
-    .pop { animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+        /* ── Status message ── */
+        .status-msg { margin-top: 6px; font-size: 13px; font-weight: bold; text-align: center; min-height: 20px; }
 
-    .caller-history {
-      margin-top: 10px;
-      font-size: 0.7rem;
-      color: rgba(255,255,255,0.6);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+        /* ── Strike indicators ── */
+        .strike-row { display: flex; gap: 8px; justify-content: center; margin-top: 6px; }
+        .strike-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #555; background: transparent; transition: background 0.3s; }
+        .strike-dot.hit { background: #e74c3c; border-color: #e74c3c; }
 
-    .caller-history span {
-      margin: 0 3px;
-      background: rgba(255,255,255,0.12);
-      border-radius: 4px;
-      padding: 1px 5px;
-    }
+        /* ── Toast notification ── */
+        #toast {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
+            background: #1e1e1e; border: 2px solid #e74c3c; border-radius: 14px;
+            padding: 18px 26px; text-align: center; z-index: 9999;
+            opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s;
+            min-width: 240px; box-shadow: 0 8px 32px rgba(0,0,0,.7);
+        }
+        #toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+        #toast.success-toast { border-color: #2ecc71; }
+        #toast .toast-icon { font-size: 36px; margin-bottom: 6px; }
+        #toast .toast-title { font-size: 18px; font-weight: bold; color: #e74c3c; margin-bottom: 4px; }
+        #toast.success-toast .toast-title { color: #2ecc71; }
+        #toast .toast-body { font-size: 14px; color: #ccc; }
 
-    /* ── Controls ── */
-    .controls {
-      display: flex;
-      gap: 10px;
-      width: 100%;
-      max-width: 380px;
-    }
+        /* ── Disqualified state ── */
+        .disqualified-overlay {
+            display: none; position: absolute; inset: 0; background: rgba(0,0,0,.65);
+            border-radius: 12px; z-index: 10; justify-content: center; align-items: center;
+            flex-direction: column; gap: 6px;
+        }
+        .card-wrapper { position: relative; margin-top: 10px; }
+        .card-wrapper.disqualified .disqualified-overlay { display: flex; }
 
-    .btn {
-      flex: 1;
-      padding: 12px;
-      border: none;
-      border-radius: 10px;
-      font-size: 0.95rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform 0.1s, box-shadow 0.1s;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
-    }
-
-    .btn:active { transform: scale(0.96); box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
-
-    .btn-start  { background: var(--accent); color: #fff; }
-    .btn-stop   { background: #e74c3c; color: #fff; }
-    .btn-new    { background: #f39c12; color: #fff; }
-
-    /* ── Speed Slider ── */
-    .speed-wrap {
-      width: 100%;
-      max-width: 380px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 0.8rem;
-      color: #555;
-    }
-
-    .speed-wrap input[type=range] {
-      flex: 1;
-      accent-color: var(--header-bg);
-    }
-
-    /* ── Bingo Card ── */
-    .card-wrap {
-      width: 100%;
-      max-width: 380px;
-    }
-
-    .bingo-header {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 5px;
-      margin-bottom: 5px;
-    }
-
-    .bingo-header div {
-      background: var(--header-bg);
-      color: #fff;
-      font-weight: 900;
-      font-size: 1.2rem;
-      text-align: center;
-      padding: 8px 0;
-      border-radius: 8px;
-      letter-spacing: 1px;
-    }
-
-    .bingo-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 5px;
-    }
-
-    .cell {
-      background: var(--card-bg);
-      border: 2px solid var(--border);
-      border-radius: 8px;
-      aspect-ratio: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: clamp(0.85rem, 4vw, 1.1rem);
-      font-weight: 700;
-      color: #111;
-      cursor: pointer;
-      user-select: none;
-      transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.15s;
-      position: relative;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-    }
-
-    .cell:active { transform: scale(0.92); }
-
-    .cell.marked {
-      background: var(--accent);
-      color: var(--accent-text);
-      border-color: #27ae60;
-      box-shadow: 0 2px 10px rgba(46,204,113,0.4);
-    }
-
-    .cell.free {
-      background: var(--free-bg);
-      color: var(--free-text);
-      border-color: #f0c000;
-      cursor: default;
-      font-size: 0.75rem;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-    }
-
-    .cell.called-flash {
-      animation: flashCell 0.5s ease;
-    }
-
-    @keyframes flashCell {
-      0%   { box-shadow: 0 0 0 0 rgba(0,136,204,0.7); }
-      50%  { box-shadow: 0 0 0 10px rgba(0,136,204,0); }
-      100% { box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
-    }
-
-    .cell.marked.called-flash {
-      animation: flashCellGreen 0.5s ease;
-    }
-
-    @keyframes flashCellGreen {
-      0%   { box-shadow: 0 0 0 0 rgba(46,204,113,0.8); }
-      50%  { box-shadow: 0 0 0 12px rgba(46,204,113,0); }
-      100% { box-shadow: 0 2px 10px rgba(46,204,113,0.4); }
-    }
-
-    /* ── Status Banner ── */
-    .status {
-      width: 100%;
-      max-width: 380px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      text-align: center;
-      background: rgba(255,255,255,0.6);
-      color: #444;
-      backdrop-filter: blur(4px);
-      min-height: 38px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* ── BINGO Overlay ── */
-    .bingo-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .bingo-overlay.show { display: flex; }
-
-    .bingo-box {
-      background: #fff;
-      border-radius: 20px;
-      padding: 36px 32px;
-      text-align: center;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-      animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
-      max-width: 300px;
-      width: 90%;
-    }
-
-    .bingo-emoji { font-size: 3.5rem; }
-    .bingo-box h2 { font-size: 2rem; color: var(--accent); margin: 8px 0 4px; font-weight: 900; }
-    .bingo-box p  { color: #666; font-size: 0.9rem; margin-bottom: 20px; }
-
-    .btn-play-again {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 12px 28px;
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(46,204,113,0.4);
-    }
-
-    /* ── Called numbers count pill ── */
-    .count-pill {
-      display: inline-block;
-      background: rgba(255,255,255,0.2);
-      border-radius: 20px;
-      padding: 2px 10px;
-      font-size: 0.75rem;
-      color: rgba(255,255,255,0.8);
-      margin-top: 6px;
-    }
-
-    @media (min-width: 420px) {
-      .cell { font-size: 1.1rem; }
-    }
-  </style>
+        /* ── Speed slider ── */
+        .speed-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 11px; color: #aaa; }
+        .speed-row input[type=range] { flex: 1; accent-color: #2ecc71; }
+    </style>
 </head>
 <body>
 
-  <div class="title">🎲 አማርኛ ቢንጎ</div>
+<!-- LOGIN / BALANCE SECTION -->
+<div id="authSection" class="auth-card">
+    <h2>ET BINGO 🎲</h2>
+    <p id="statusMsg">መረጃዎ በመመርመር ላይ ነው...</p>
 
-  <!-- Caller display -->
-  <div class="caller-wrap">
-    <div class="caller-label">Called Number / የተጠራ ቁጥር</div>
-    <div class="caller-number" id="callerDisplay">
-      <span>—</span>
+    <div id="regForm" style="display:none;">
+        <p style="color:#ffb74d;">ለመጫወት እባክዎን መጀመሪያ ይመዝገቡ!</p>
+        <input type="text" id="phoneInput" placeholder="የስልክ ቁጥር ያስገቡ (09...)">
+        <button class="btn" onclick="submitRegister()">ይመዝገቡ (Register)</button>
     </div>
-    <div class="count-pill" id="countPill">0 / 75 ተጠርተዋል</div>
-    <div class="caller-history" id="callerHistory"></div>
-  </div>
 
-  <!-- Controls -->
-  <div class="controls">
-    <button class="btn btn-start" id="btnStart" onclick="startGame()">▶ ጀምር</button>
-    <button class="btn btn-stop"  id="btnStop"  onclick="stopGame()" disabled>⏸ አቁም</button>
-    <button class="btn btn-new"   onclick="newCard()">🔄 አዲስ</button>
-  </div>
-
-  <!-- Speed -->
-  <div class="speed-wrap">
-    <span>🐢</span>
-    <input type="range" id="speedRange" min="2" max="10" value="5" step="1" />
-    <span>🐇</span>
-    <span id="speedLabel" style="min-width:32px;text-align:right">5s</span>
-  </div>
-
-  <!-- Bingo Card -->
-  <div class="card-wrap">
-    <div class="bingo-header">
-      <div>B</div><div>I</div><div>N</div><div>G</div><div>O</div>
+    <div id="playForm" style="display:none;">
+        <p>የእርስዎ ቀሪ ሂሳብ (Balance)፦</p>
+        <h2 style="color:#2ecc71;margin:5px 0;" id="userBalanceText">0.00 ብር</h2>
+        <p style="font-size:13px;color:#bbb;">የጨዋታው መግቢያ ክፍያ፦ <b>30 ብር</b></p>
+        <div id="balanceError" class="error-alert" style="display:none;">
+            ⚠️ ባላንስዎ ከ 30 ብር ያነሰ ስለሆነ መጫወት አይችሉም!<br>እባክዎን ለአድሚኑ ደውለው Deposit ያስደርጉ።
+        </div>
+        <button class="btn" id="enterGameBtn" onclick="enterGame()">ወደ ጨዋታው ግባ 🎲</button>
     </div>
-    <div class="bingo-grid" id="bingoGrid"></div>
-  </div>
+</div>
 
-  <!-- Status -->
-  <div class="status" id="statusMsg">አዲስ ካርድ ተፈጠረ። ▶ ጀምር ን ተጫን!</div>
+<!-- GAME SECTION -->
+<div id="gameSection" class="game-container">
 
-  <!-- BINGO overlay -->
-  <div class="bingo-overlay" id="bingoOverlay">
-    <div class="bingo-box">
-      <div class="bingo-emoji">🏆</div>
-      <h2>BINGO!</h2>
-      <p>እንኳን ደስ አለዎት! አሸነፉ!</p>
-      <button class="btn-play-again" onclick="newCard(); closeBingo()">🔄 እንደ ገና ጫወት</button>
+    <!-- Top header: title + balance -->
+    <div class="header">
+        <div class="title">ET BINGO 🎲</div>
+        <div class="bal-display">💰 <span id="gameBal">0</span> ብር</div>
     </div>
-  </div>
+
+    <!-- Caller box -->
+    <div class="caller-box">
+        <!-- Row: label + mute button -->
+        <div class="caller-top-row">
+            <span class="caller-label">የተጠራው ቁጥር</span>
+            <button class="mute-btn unmuted" id="muteBtn" onclick="toggleMute()">
+                <span id="muteIcon">🔊</span>
+                <span id="muteLabel">ድምፅ ኦን</span>
+            </button>
+        </div>
+
+        <!-- Big current number -->
+        <div class="current-number" id="currentCall">--</div>
+
+        <!-- History strip -->
+        <div class="history-section">
+            <div class="history-label">⏱ ቀደም ሲሉ የተጠሩ ቁጥሮች (ሁሉም):</div>
+            <div class="history-container" id="historyContainer">
+                <span class="history-empty" id="historyEmpty">ቁጥሮች ሲጠሩ ይታያሉ...</span>
+            </div>
+        </div>
+
+        <!-- Speed slider -->
+        <div class="speed-row">
+            <span>🐢</span>
+            <input type="range" id="speedSlider" min="2" max="10" value="4" oninput="updateSpeed(this.value)">
+            <span>🐇</span>
+            <span id="speedLabel">4ሰ</span>
+        </div>
+    </div>
+
+    <!-- Card wrapped for disqualified overlay -->
+    <div class="card-wrapper" id="cardWrapper">
+        <div class="bingo-card" id="bingoCard">
+            <div class="header-cell">B</div>
+            <div class="header-cell">I</div>
+            <div class="header-cell">N</div>
+            <div class="header-cell">G</div>
+            <div class="header-cell">O</div>
+        </div>
+        <div class="disqualified-overlay">
+            <div style="font-size:42px;">🚫</div>
+            <div style="font-size:16px;font-weight:bold;color:#e74c3c;">ከጨዋታው ተሰርዘዋል!</div>
+            <div style="font-size:12px;color:#aaa;margin-top:4px;">2 ጊዜ ሐሰት ቢንጎ ጠርተዋል</div>
+        </div>
+    </div>
+
+    <!-- Strike dots -->
+    <div class="strike-row" id="strikeRow">
+        <span style="font-size:12px;color:#aaa;">ስህተቶች:</span>
+        <div class="strike-dot" id="dot1"></div>
+        <div class="strike-dot" id="dot2"></div>
+    </div>
+
+    <!-- Status message -->
+    <div class="status-msg" id="gameStatusMsg"></div>
+
+    <!-- BINGO claim button -->
+    <button class="bingo-btn" id="bingoClaimBtn" onclick="claimBingo()">🏆 BINGO! (አሸንፌያለሁ)</button>
+</div>
+
+<!-- Toast overlay -->
+<div id="toast">
+    <div class="toast-icon" id="toastIcon"></div>
+    <div class="toast-title" id="toastTitle"></div>
+    <div class="toast-body" id="toastBody"></div>
+</div>
 
 <script>
-  // ── Telegram WebApp init ──
-  if (window.Telegram && window.Telegram.WebApp) {
-    Telegram.WebApp.ready();
-    Telegram.WebApp.expand();
-  }
+    const tg = window.Telegram?.WebApp;
+    if (tg) tg.expand();
 
-  // ── State ──
-  let card       = [];   // 5x5 grid values
-  let marked     = new Set();
-  let calledNums = [];
-  let allNumbers = [];
-  let callerTimer = null;
-  let isRunning  = false;
-  let callIndex  = 0;
+    let tgUser = tg?.initDataUnsafe?.user || { id: "12345678", username: "test_user" };
+    let currentBalance = 0;
+    const BET_AMOUNT = 30;
 
-  const LETTERS = { B:1, I:2, N:3, G:4, O:5 };
-  const COLS    = ['B','I','N','G','O'];
-  const AM_LETTERS = { B:'ቢ', I:'አይ', N:'ኤን', G:'ጂ', O:'ኦ' };
+    /* ── State ── */
+    let isMuted        = false;
+    let calledNumbers  = [];
+    let allNumbers     = [];
+    let intervalId     = null;
+    let strikes        = 0;
+    let isDisqualified = false;
+    let callIntervalMs = 4000;
+    let audioPlayer    = new Audio();
+    let toastTimer     = null;
 
-  // ── Speed control ──
-  const speedRange = document.getElementById('speedRange');
-  const speedLabel = document.getElementById('speedLabel');
-  speedRange.addEventListener('input', () => {
-    const s = parseInt(speedRange.value);
-    speedLabel.textContent = s + 's';
-    if (isRunning) { stopCaller(); startCaller(); }
-  });
+    /* ════════════════════════════════════
+       AUTH / LOBBY
+    ════════════════════════════════════ */
+    async function checkStatus() {
+        try {
+            let res = await fetch('/api/check_user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegram_id: String(tgUser.id), username: tgUser.username || "User" })
+            });
+            let data = await res.json();
 
-  function getInterval() {
-    return (11 - parseInt(speedRange.value)) * 1000; // 2s-10s
-  }
+            document.getElementById('statusMsg').style.display = 'none';
 
-  // ── Card generation ──
-  function generateCard() {
-    const ranges = [
-      [1,15],[16,30],[31,45],[46,60],[61,75]
-    ];
-    const cols = ranges.map(([lo,hi]) => shuffle(range(lo,hi)).slice(0,5));
-    cols[2][2] = 'FREE'; // center free space
-    const grid = [];
-    for (let r = 0; r < 5; r++) {
-      const row = [];
-      for (let c = 0; c < 5; c++) row.push(cols[c][r]);
-      grid.push(row);
+            if (data.registered) {
+                currentBalance = data.balance;
+                document.getElementById('playForm').style.display = 'block';
+                document.getElementById('userBalanceText').innerText = currentBalance.toFixed(2) + " ብር";
+
+                if (currentBalance < BET_AMOUNT) {
+                    document.getElementById('balanceError').style.display = 'block';
+                    document.getElementById('enterGameBtn').style.opacity = '0.5';
+                    document.getElementById('enterGameBtn').innerText = "ባላንስዎ አይበቃም ❌";
+                } else {
+                    document.getElementById('balanceError').style.display = 'none';
+                    document.getElementById('enterGameBtn').style.opacity = '1';
+                    document.getElementById('enterGameBtn').innerText = "ወደ ጨዋታው ግባ 🎲";
+                }
+            } else {
+                document.getElementById('regForm').style.display = 'block';
+            }
+        } catch (err) {
+            document.getElementById('statusMsg').innerText = "⚠️ ከሰርቨር ጋር መገናኘት አልተቻለም!";
+        }
     }
-    return grid;
-  }
 
-  function range(lo, hi) {
-    const arr = [];
-    for (let i = lo; i <= hi; i++) arr.push(i);
-    return arr;
-  }
+    async function submitRegister() {
+        let phone = document.getElementById('phoneInput').value;
+        if (!phone || phone.length < 9) return alert('እባክዎን ትክክለኛ ስልክ ቁጥር ያስገቡ!');
 
-  function shuffle(arr) {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
+        let res = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegram_id: String(tgUser.id), phone })
+        });
+        let data = await res.json();
+        if (data.status === 'success') { alert('በጥሩ ሁኔታ ተመዝግበዋል!'); checkStatus(); }
     }
-    return a;
-  }
 
-  // ── Render card ──
-  function renderCard() {
-    const grid = document.getElementById('bingoGrid');
-    grid.innerHTML = '';
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 5; c++) {
-        const val = card[r][c];
-        const key = `${r}_${c}`;
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.id = `cell_${key}`;
-
-        if (val === 'FREE') {
-          cell.classList.add('free', 'marked');
-          cell.textContent = '⭐ FREE';
+    async function enterGame() {
+        if (currentBalance < BET_AMOUNT) {
+            alert('⚠️ Insufficient Balance! ባላንስዎ ' + currentBalance + ' ብር ነው:: ለመጫወት ቢያንስ ' + BET_AMOUNT + ' ብር ያስፈልግዎታል!');
+            return;
+        }
+        let res = await fetch('/api/game/start_round', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegram_id: String(tgUser.id), bet_amount: BET_AMOUNT })
+        });
+        let data = await res.json();
+        if (data.status === 'success') {
+            currentBalance = data.remaining_balance;
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('gameSection').style.display = 'block';
+            document.getElementById('gameBal').innerText = currentBalance.toFixed(2);
+            startBingoGame();
         } else {
-          cell.textContent = val;
-          if (marked.has(key)) cell.classList.add('marked');
-          cell.addEventListener('click', () => toggleMark(r, c));
+            alert('የጨዋታ ክፍያ ማስከፈል አልተቻለም፦ ' + data.message);
         }
-        grid.appendChild(cell);
-      }
     }
-  }
 
-  function toggleMark(r, c) {
-    const key = `${r}_${c}`;
-    const val = card[r][c];
-    if (val === 'FREE') return;
-    if (marked.has(key)) {
-      marked.delete(key);
-    } else {
-      marked.add(key);
-    }
-    const cell = document.getElementById(`cell_${key}`);
-    cell.classList.toggle('marked', marked.has(key));
+    /* ════════════════════════════════════
+       FEATURE 1 — MUTE / UNMUTE
+    ════════════════════════════════════ */
+    function toggleMute() {
+        isMuted = !isMuted;
+        const btn   = document.getElementById('muteBtn');
+        const icon  = document.getElementById('muteIcon');
+        const label = document.getElementById('muteLabel');
 
-    if (checkBingo()) showBingo();
-  }
-
-  // ── Number calling ──
-  function buildCallOrder() {
-    allNumbers = shuffle(range(1, 75));
-    callIndex  = 0;
-  }
-
-  function getLetterForNum(n) {
-    if (n <= 15) return 'B';
-    if (n <= 30) return 'I';
-    if (n <= 45) return 'N';
-    if (n <= 60) return 'G';
-    return 'O';
-  }
-
-  function callNext() {
-    if (callIndex >= allNumbers.length) {
-      stopGame();
-      setStatus('ሁሉም ቁጥሮች ተጠርተዋል! ጨዋታው አለቀ።');
-      return;
-    }
-    const num  = allNumbers[callIndex++];
-    const col  = getLetterForNum(num);
-    calledNums.push(num);
-
-    updateCallerDisplay(col, num);
-    highlightCalledCells(num);
-    speakAmharic(col, num);
-    updateCountPill();
-    updateHistory();
-  }
-
-  function updateCallerDisplay(col, num) {
-    const el = document.getElementById('callerDisplay');
-    el.innerHTML = `<span class="letter">${col}</span><span>${num}</span>`;
-    el.classList.remove('pop');
-    void el.offsetWidth; // reflow to restart animation
-    el.classList.add('pop');
-  }
-
-  function highlightCalledCells(num) {
-    // Flash any cell on the card that matches
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 5; c++) {
-        if (card[r][c] === num) {
-          const cell = document.getElementById(`cell_${r}_${c}`);
-          if (cell) {
-            cell.classList.remove('called-flash');
-            void cell.offsetWidth;
-            cell.classList.add('called-flash');
-          }
+        if (isMuted) {
+            icon.textContent  = '🔇';
+            label.textContent = 'ድምፅ ኦፍ';
+            btn.classList.replace('unmuted', 'muted');
+            audioPlayer.pause();
+        } else {
+            icon.textContent  = '🔊';
+            label.textContent = 'ድምፅ ኦን';
+            btn.classList.replace('muted', 'unmuted');
         }
-      }
-    }
-  }
-
-  function updateCountPill() {
-    document.getElementById('countPill').textContent =
-      `${calledNums.length} / 75 ተጠርተዋል`;
-  }
-
-  function updateHistory() {
-    const hist = document.getElementById('callerHistory');
-    const recent = calledNums.slice(-8).reverse().map(n => {
-      const l = getLetterForNum(n);
-      return `<span>${l}${n}</span>`;
-    });
-    hist.innerHTML = recent.join('');
-  }
-
-  // ── TTS ──
-  let voices = [];
-  if ('speechSynthesis' in window) {
-    const loadVoices = () => { voices = window.speechSynthesis.getVoices(); };
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-    loadVoices();
-  }
-
-  function speakAmharic(col, num) {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-
-    const amLetter = AM_LETTERS[col];
-    const text = `${amLetter} ${num}`;
-
-    const utt = new SpeechSynthesisUtterance(text);
-
-    // Try to find an Amharic voice first
-    const amVoice = voices.find(v => v.lang.startsWith('am'));
-    if (amVoice) {
-      utt.voice = amVoice;
-      utt.lang  = 'am-ET';
-    } else {
-      // Fallback: speak the English letter + number clearly
-      const enText = `${col} ${num}`;
-      const fallback = new SpeechSynthesisUtterance(enText);
-      fallback.lang = 'en-US';
-      fallback.rate = 0.85;
-      fallback.pitch = 1;
-      window.speechSynthesis.speak(fallback);
-      return;
     }
 
-    utt.rate  = 0.85;
-    utt.pitch = 1;
-    window.speechSynthesis.speak(utt);
-  }
-
-  // ── Bingo check ──
-  function checkBingo() {
-    // Rows
-    for (let r = 0; r < 5; r++) {
-      if ([0,1,2,3,4].every(c => marked.has(`${r}_${c}`))) return true;
+    function speakAmharicAudio(text) {
+        if (isMuted) return;
+        try {
+            audioPlayer.pause();
+            let src = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=am&client=tw-ob`;
+            audioPlayer.src = src;
+            audioPlayer.play().catch(() => {});
+        } catch (e) {}
     }
-    // Columns
-    for (let c = 0; c < 5; c++) {
-      if ([0,1,2,3,4].every(r => marked.has(`${r}_${c}`))) return true;
+
+    /* ════════════════════════════════════
+       FEATURE 2 — HISTORY STRIP
+    ════════════════════════════════════ */
+    const ballColorClass = { B: 'ball-B', I: 'ball-I', N: 'ball-N', G: 'ball-G', O: 'ball-O' };
+
+    function addBallToHistory(display) {
+        const letter = display[0];                     // 'B', 'I', etc.
+        const empty  = document.getElementById('historyEmpty');
+        if (empty) empty.remove();
+
+        const container = document.getElementById('historyContainer');
+        const ball = document.createElement('div');
+        ball.className = 'bingo-ball ' + (ballColorClass[letter] || 'ball-B');
+        ball.title = display;
+
+        // Show just the number part, small letter at top
+        const num = display.split('-')[1];
+        ball.innerHTML = `<div style="text-align:center;line-height:1.1"><div style="font-size:8px;opacity:.8">${letter}</div><div style="font-size:11px">${num}</div></div>`;
+
+        // Prepend = newest on left, oldest scrolls right
+        container.prepend(ball);
+        container.scrollLeft = 0;    // always show newest
     }
-    // Diagonals
-    if ([0,1,2,3,4].every(i => marked.has(`${i}_${i}`))) return true;
-    if ([0,1,2,3,4].every(i => marked.has(`${i}_${4-i}`))) return true;
-    return false;
-  }
 
-  function showBingo() {
-    stopGame();
-    document.getElementById('bingoOverlay').classList.add('show');
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance('ቢንጎ! እንኳን ደስ አለዎት!');
-      utt.lang = 'am-ET';
-      window.speechSynthesis.speak(utt);
+    /* ════════════════════════════════════
+       GAME SETUP
+    ════════════════════════════════════ */
+    function generateCard() {
+        const cols = [
+            getRandomNumbers(1,  15, 5),
+            getRandomNumbers(16, 30, 5),
+            getRandomNumbers(31, 45, 5),
+            getRandomNumbers(46, 60, 5),
+            getRandomNumbers(61, 75, 5)
+        ];
+        cols[2][2] = "FREE";
+
+        const cardEl = document.getElementById('bingoCard');
+        while (cardEl.children.length > 5) cardEl.removeChild(cardEl.lastChild);
+
+        for (let row = 0; row < 5; row++) {
+            for (let col = 0; col < 5; col++) {
+                const val  = cols[col][row];
+                const cell = document.createElement('div');
+                cell.className = 'cell' + (val === 'FREE' ? ' free selected' : '');
+                cell.innerText = val;
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+                cell.dataset.val = val;
+
+                cell.onclick = function () {
+                    if (isDisqualified || val === 'FREE') return;
+                    const numVal = Number(val);
+                    if (calledNumbers.includes(numVal)) {
+                        this.classList.toggle('selected');
+                        document.getElementById('gameStatusMsg').innerText = '';
+                    } else {
+                        document.getElementById('gameStatusMsg').innerText = '🛑 ቁጥር ' + val + ' ገና አልተጠራም!';
+                    }
+                };
+                cardEl.appendChild(cell);
+            }
+        }
     }
-  }
 
-  function closeBingo() {
-    document.getElementById('bingoOverlay').classList.remove('show');
-  }
+    function getRandomNumbers(min, max, count) {
+        let arr = [];
+        while (arr.length < count) {
+            let r = Math.floor(Math.random() * (max - min + 1)) + min;
+            if (!arr.includes(r)) arr.push(r);
+        }
+        return arr;
+    }
 
-  // ── Game controls ──
-  function startGame() {
-    if (isRunning) return;
-    isRunning = true;
-    document.getElementById('btnStart').disabled = true;
-    document.getElementById('btnStop').disabled  = false;
-    setStatus('ቁጥሮች እየተጠሩ ነው…');
-    startCaller();
-  }
+    function updateSpeed(val) {
+        const sec = 12 - Number(val);   // slider 2→10 maps to 10→2 seconds
+        callIntervalMs = sec * 1000;
+        document.getElementById('speedLabel').innerText = sec + 'ሰ';
+        if (intervalId) {
+            clearInterval(intervalId);
+            startCalling();
+        }
+    }
 
-  function stopGame() {
-    isRunning = false;
-    stopCaller();
-    document.getElementById('btnStart').disabled = false;
-    document.getElementById('btnStop').disabled  = true;
-    if (calledNums.length > 0 && calledNums.length < 75)
-      setStatus(`ቆሟል — ${calledNums.length} ቁጥሮች ተጠርተዋል። ▶ ለመቀጠል ጀምር ን ተጫን።`);
-  }
+    function startCalling() {
+        intervalId = setInterval(() => {
+            if (allNumbers.length === 0) { clearInterval(intervalId); return; }
+            let next = allNumbers.pop();
+            calledNumbers.push(Number(next.num));
+            document.getElementById('currentCall').innerText = next.display;
+            speakAmharicAudio(next.amharicText);
+            addBallToHistory(next.display);
+        }, callIntervalMs);
+    }
 
-  function startCaller() {
-    callNext();
-    callerTimer = setInterval(callNext, getInterval());
-  }
+    function startBingoGame() {
+        calledNumbers  = [];
+        allNumbers     = [];
+        strikes        = 0;
+        isDisqualified = false;
 
-  function stopCaller() {
-    if (callerTimer) { clearInterval(callerTimer); callerTimer = null; }
-  }
+        // Reset UI
+        document.getElementById('historyContainer').innerHTML =
+            '<span class="history-empty" id="historyEmpty">ቁጥሮች ሲጠሩ ይታያሉ...</span>';
+        document.getElementById('currentCall').innerText   = '--';
+        document.getElementById('gameStatusMsg').innerText = '';
+        document.getElementById('dot1').classList.remove('hit');
+        document.getElementById('dot2').classList.remove('hit');
+        document.getElementById('cardWrapper').classList.remove('disqualified');
+        document.getElementById('bingoClaimBtn').disabled  = false;
 
-  function newCard() {
-    stopGame();
-    card       = generateCard();
-    marked     = new Set(['2_2']); // FREE cell
-    calledNums = [];
-    callIndex  = 0;
-    buildCallOrder();
-    renderCard();
-    document.getElementById('callerDisplay').innerHTML = '<span>—</span>';
-    document.getElementById('callerHistory').innerHTML = '';
-    updateCountPill();
-    setStatus('አዲስ ካርድ ተፈጠረ። ▶ ጀምር ን ተጫን!');
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-  }
+        generateCard();
 
-  function setStatus(msg) {
-    document.getElementById('statusMsg').textContent = msg;
-  }
+        for (let i = 1; i <= 75; i++) {
+            let L = i <= 15 ? 'B' : i <= 30 ? 'I' : i <= 45 ? 'N' : i <= 60 ? 'G' : 'O';
+            let A = i <= 15 ? 'ቢ ' : i <= 30 ? 'አይ ' : i <= 45 ? 'ኤን ' : i <= 60 ? 'ጂ ' : 'ኦ ';
+            allNumbers.push({ amharicText: A + i, display: L + '-' + i, num: i });
+        }
+        allNumbers.sort(() => Math.random() - 0.5);
+        startCalling();
+    }
 
-  // ── Init ──
-  newCard();
+    /* ════════════════════════════════════
+       FEATURE 3 — MANUAL BINGO CLAIM
+       No auto-win detection anywhere.
+    ════════════════════════════════════ */
+    function claimBingo() {
+        if (isDisqualified) return;
+
+        // Build 5×5 marked matrix from player's selected cells
+        let markedMatrix = Array(5).fill(null).map(() => Array(5).fill(false));
+        document.querySelectorAll('.cell.selected').forEach(cell => {
+            markedMatrix[parseInt(cell.dataset.row)][parseInt(cell.dataset.col)] = true;
+        });
+
+        if (checkWin(markedMatrix)) {
+            // ── VALID BINGO ──
+            clearInterval(intervalId);
+            showToast('success', '🎉', 'ቢንጎ! አሸንፈዋል!', 'እንኳን ደስ አለዎት! ድሉ የእርስዎ ነው!', 4000);
+            document.getElementById('gameStatusMsg').innerText = '';
+            document.getElementById('bingoClaimBtn').disabled = true;
+            speakAmharicAudio('ቢንጎ አሸንፈዋል');
+        } else {
+            // ── FALSE ALARM ──
+            strikes++;
+            const dot = document.getElementById('dot' + strikes);
+            if (dot) dot.classList.add('hit');
+
+            if (strikes >= 2) {
+                // Disqualified
+                isDisqualified = true;
+                clearInterval(intervalId);
+                document.getElementById('bingoClaimBtn').disabled = true;
+                document.getElementById('cardWrapper').classList.add('disqualified');
+                showToast('error', '🚫', 'ከጨዋታው ተሰርዘዋል!', '2 ጊዜ ሐሰት ቢንጎ ጠርተዋል። ጨዋታው አልቋል።', 5000);
+                document.getElementById('gameStatusMsg').innerText = '';
+            } else {
+                showToast('error', '⚠️', 'ሐሰት ቢንጎ! Strike ' + strikes + '/2',
+                    strikes === 1
+                        ? 'ትክክለኛ አሸናፊ ዘዴ ያስቡ! ስህተት 1 ቀርቷል።'
+                        : 'ጥንቃቄ ያድርጉ! ቀጣዩ ሐሰት ቢንጎ ያስወጥቅዎታል!',
+                    3500);
+                document.getElementById('gameStatusMsg').innerText = '';
+            }
+        }
+    }
+
+    function checkWin(m) {
+        // Rows
+        for (let i = 0; i < 5; i++)
+            if (m[i][0] && m[i][1] && m[i][2] && m[i][3] && m[i][4]) return true;
+        // Columns
+        for (let i = 0; i < 5; i++)
+            if (m[0][i] && m[1][i] && m[2][i] && m[3][i] && m[4][i]) return true;
+        // Diagonals
+        if (m[0][0] && m[1][1] && m[2][2] && m[3][3] && m[4][4]) return true;
+        if (m[0][4] && m[1][3] && m[2][2] && m[3][1] && m[4][0]) return true;
+        return false;
+    }
+
+    /* ════════════════════════════════════
+       TOAST HELPER
+    ════════════════════════════════════ */
+    function showToast(type, icon, title, body, durationMs) {
+        const el = document.getElementById('toast');
+        document.getElementById('toastIcon').textContent  = icon;
+        document.getElementById('toastTitle').textContent = title;
+        document.getElementById('toastBody').textContent  = body;
+        el.className = type === 'success' ? 'show success-toast' : 'show';
+
+        clearTimeout(toastTimer);
+        el.addEventListener('click', dismissToast, { once: true });
+        toastTimer = setTimeout(dismissToast, durationMs);
+    }
+
+    function dismissToast() {
+        const el = document.getElementById('toast');
+        el.classList.remove('show', 'success-toast');
+    }
+
+    window.onload = checkStatus;
 </script>
 </body>
 </html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ET Bingo - Admin Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 15px; margin: 0; }
+        .stats-box { background: #1e1e1e; padding: 15px; border-radius: 10px; border: 1px solid #2ecc71; margin-bottom: 20px; text-align: center; }
+        .stats-amount { font-size: 32px; font-weight: bold; color: #2ecc71; margin-top: 5px; }
+        table { width: 100%; border-collapse: collapse; background: #1e1e1e; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
+        th { background: #00838f; color: white; }
+        input[type="number"] { width: 90px; padding: 6px; border-radius: 4px; border: 1px solid #444; background: #222; color: #fff; text-align: center; }
+        .dep-btn { background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .refresh-btn { background: #0288d1; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <h2>🎛️ የጨዋታው አድሚን መቆጣጠሪያ (Admin Control)</h2>
+
+    <div class="stats-box">
+        <div>💰 የእርሶ 25% የተሰበሰበ ኮሚሽን (Total Admin Cut):</div>
+        <div class="stats-amount"><span id="adminEarnings">0.00</span> ብር</div>
+    </div>
+
+    <h3>👥 የተመዘገቡ ተጫዋቾች ዝርዝር</h3>
+    <button class="refresh-btn" onclick="loadUsers()">🔄 Refresh List</button>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Telegram ID</th>
+                <th>Username</th>
+                <th>ስልክ ቁጥር</th>
+                <th>ያላቸው ባላንስ</th>
+                <th>ብር/ቶከን መሙያ (Deposit)</th>
+            </tr>
+        </thead>
+        <tbody id="userTable">
+            <!-- Data dynamically loads here -->
+        </tbody>
+    </table>
+
+    <script>
+        async function loadUsers() {
+            let res = await fetch('/api/admin/users');
+            let data = await res.json();
+
+            document.getElementById('adminEarnings').innerText = data.admin_earnings.toFixed(2);
+
+            let tbody = document.getElementById('userTable');
+            tbody.innerHTML = '';
+
+            if(data.users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#aaa;">ገና የተመዘገበ ተጫዋች የለም</td></tr>';
+                return;
+            }
+
+            data.users.forEach(u => {
+                let tg_id = u[0];
+                let username = u[1] ? '@' + u[1] : 'የለውም';
+                let phone = u[2];
+                let balance = u[3];
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${tg_id}</td>
+                        <td>${username}</td>
+                        <td>${phone}</td>
+                        <td style="color:#2ecc71; font-weight:bold;">${balance.toFixed(2)} ብር</td>
+                        <td>
+                            <input type="number" id="amt_${tg_id}" placeholder="መጠን">
+                            <button class="dep-btn" onclick="deposit('${tg_id}')">Deposit</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function deposit(tg_id) {
+            let amtInput = document.getElementById(`amt_${tg_id}`);
+            let amount = amtInput.value;
+
+            if(!amount || amount <= 0) return alert('እባክዎን ትክክለኛ የገንዘብ መጠን ያስገቡ!');
+
+            let res = await fetch('/api/admin/deposit', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegram_id: tg_id, amount: amount })
+            });
+
+            let data = await res.json();
+            if(data.status === 'success') {
+                alert(`✅ ${amount} ብር በጥሩ ሁኔታ ተሞልቷል!`);
+                amtInput.value = '';
+                loadUsers();
+            }
+        }
+
+        loadUsers();
+    </script>
+</body>
+</html>
