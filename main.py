@@ -1,34 +1,17 @@
 import os
-import json
 import random
 from flask import Flask, render_template_string, jsonify, request
 
 app = Flask(__name__)
 
-# --- PERSISTENT STORAGE USING JSON FILES ---
-USERS_FILE = "users.json"
-REQUESTS_FILE = "requests.json"
-
-def load_data(file_path, default_val):
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return default_val
-    return default_val
-
-def save_data(file_path, data):
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
-# ዴታዎችን ከ ፋይል መጫን
-users = load_data(USERS_FILE, {})
-deposit_requests = load_data(REQUESTS_FILE, [])
+# --- IN-MEMORY DATABASE ---
+users = {}          
+deposit_requests = [] 
 
 admin_telebirr = "0982289449"
 
 rooms = {
+    "room_test_1": {"id": "room_test_1", "name": "🧪 የፈተና ክፍል (ለፍተሻ 20 ብር - 1 ሰው)", "entry_fee": 20, "max_players": 1, "players": [], "status": "waiting"},
     "room_20_5": {"id": "room_20_5", "name": "ባለ 20 ብር (5 ሰው)", "entry_fee": 20, "max_players": 5, "players": [], "status": "waiting"},
     "room_30_5": {"id": "room_30_5", "name": "ባለ 30 ብር (5 ሰው)", "entry_fee": 30, "max_players": 5, "players": [], "status": "waiting"},
     "room_40_5": {"id": "room_40_5", "name": "ባለ 40 ብር (5 ሰው)", "entry_fee": 40, "max_players": 5, "players": [], "status": "waiting"},
@@ -60,7 +43,7 @@ HTML_TEMPLATE = """
         .section-title { font-size: 16px; margin: 15px 0 10px 0; text-align: left; border-left: 4px solid var(--accent-color); padding-left: 8px; }
         .rooms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .room-card { background: var(--card-bg); border: 1px solid #333; border-radius: 10px; padding: 12px; text-align: center; }
-        .room-card h4 { margin: 0 0 5px 0; color: #fff; }
+        .room-card h4 { margin: 0 0 5px 0; color: #fff; font-size: 14px; }
         .room-card p { margin: 0 0 8px 0; font-size: 12px; color: #aaa; }
         .btn { background-color: var(--btn-blue); color: white; border: none; padding: 10px; font-size: 14px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; }
         .btn-success { background-color: var(--btn-green); }
@@ -75,6 +58,7 @@ HTML_TEMPLATE = """
 </head>
 <body>
 
+    <!-- Registration Screen -->
     <div id="reg-screen" class="card">
         <h2>👋 እንኳን ወደ ET Bingo መጡ</h2>
         <p>ለመጀመር ስልክ ቁጥርዎን ያስገቡ</p>
@@ -82,12 +66,14 @@ HTML_TEMPLATE = """
         <button class="btn btn-success" onclick="registerUser()">ይመዝገቡ (Register)</button>
     </div>
 
+    <!-- Main App Screen -->
     <div id="main-screen" style="display:none;">
         <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
             <div><b>🎲 ET BINGO</b></div>
             <div class="balance-box">💰 <span id="balance">0.00</span> ETB</div>
         </div>
 
+        <!-- Active Game Section -->
         <div id="game-section" class="card" style="display:none;">
             <div style="background:#222; padding:10px; border-radius:8px; font-size:18px; margin-bottom:10px;">
                 የወጣው ቁጥር፦ <span id="current-drawn-num" style="color:var(--accent-color); font-weight:bold;">-</span>
@@ -96,9 +82,17 @@ HTML_TEMPLATE = """
             <button class="btn btn-bingo" onclick="claimBingo()">🎉 BINGO!</button>
         </div>
 
+        <!-- Rooms Section -->
         <div id="rooms-section" class="card">
             <div class="section-title">የጨዋታ ክፍሎች (Auto Rooms)</div>
-            <div class="rooms-grid">
+            <div class="rooms-grid" style="grid-template-columns: 1fr;">
+                <div class="room-card" style="border: 2px solid var(--accent-color);">
+                    <h4 style="color:var(--accent-color);">🧪 የፈተና ክፍል (1 ሰው ብቻ)</h4>
+                    <p>የመግቢያ ዋጋ፦ 20 ብር</p>
+                    <button class="btn btn-success" onclick="joinRoom('room_test_1')">በፍጥነት ሞክር (Test Join)</button>
+                </div>
+            </div>
+            <div class="rooms-grid" style="margin-top: 10px;">
                 <div class="room-card">
                     <h4>ባለ 20 ብር</h4>
                     <p>5 ተጫዋቾች</p>
@@ -122,6 +116,7 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
+        <!-- Telebirr Deposit Section -->
         <div class="card">
             <div class="section-title" style="margin-top:0;">📲 ቴሌብር ሂሳብ ማስገባት (Deposit)</div>
             <p style="font-size: 13px; color: #aaa; text-align: left;">በዚህ የቴሌብር ቁጥር ብር ያስተላልፉ፦ <b style="color:var(--accent-color);">0982289449</b></p>
@@ -373,8 +368,6 @@ def admin_page():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    global users
-    users = load_data(USERS_FILE, {})
     data = request.json
     phone = data.get('phone')
     if not phone:
@@ -382,14 +375,11 @@ def register():
 
     if phone not in users:
         users[phone] = {"phone": phone, "balance": 0.0}
-        save_data(USERS_FILE, users)
 
     return jsonify({"success": True, "balance": users[phone]["balance"]})
 
 @app.route('/api/get_user', methods=['GET'])
 def get_user():
-    global users
-    users = load_data(USERS_FILE, {})
     phone = request.args.get('phone')
     if phone in users:
         return jsonify({"success": True, "balance": users[phone]["balance"]})
@@ -397,8 +387,6 @@ def get_user():
 
 @app.route('/api/deposit', methods=['POST'])
 def deposit():
-    global deposit_requests
-    deposit_requests = load_data(REQUESTS_FILE, [])
     data = request.json
     phone = data.get('phone')
     amount = float(data.get('amount', 0))
@@ -412,28 +400,20 @@ def deposit():
         "screenshot": screenshot,
         "status": "pending"
     })
-    save_data(REQUESTS_FILE, deposit_requests)
     return jsonify({"success": True, "message": "የክፍያ ማረጋገጫዎ ለአድሚን ተልኳል! ሲታረም ባላንስዎ ይጨመራል።"})
 
 @app.route('/api/admin/requests', methods=['GET'])
 def admin_requests():
-    global deposit_requests
-    deposit_requests = load_data(REQUESTS_FILE, [])
     pending = [r for r in deposit_requests if r["status"] == "pending"]
     return jsonify({"requests": pending})
 
 @app.route('/api/admin/users', methods=['GET'])
 def admin_users():
-    global users
-    users = load_data(USERS_FILE, {})
     all_users = list(users.values())
     return jsonify({"users": all_users})
 
 @app.route('/api/admin/approve', methods=['POST'])
 def admin_approve():
-    global deposit_requests, users
-    deposit_requests = load_data(REQUESTS_FILE, [])
-    users = load_data(USERS_FILE, {})
     data = request.json
     req_id = data.get('req_id')
 
@@ -444,16 +424,12 @@ def admin_approve():
             amount = req["amount"]
             if phone in users:
                 users[phone]["balance"] += amount
-                save_data(USERS_FILE, users)
-            save_data(REQUESTS_FILE, deposit_requests)
             return jsonify({"success": True, "message": "በስኬት አጸድቀዋል! ብሩ ተደምሯል።"})
 
     return jsonify({"success": False, "message": "ጥያቄው አልተገኘም!"}), 404
 
 @app.route('/api/join_room', methods=['POST'])
 def join_room():
-    global users
-    users = load_data(USERS_FILE, {})
     data = request.json
     phone = data.get('phone')
     room_id = data.get('room_id')
@@ -476,14 +452,11 @@ def join_room():
         room['status'] = "playing"
         for p in room['players']:
             users[p]['balance'] -= room['entry_fee']
-        save_data(USERS_FILE, users)
 
     return jsonify({"success": True, "message": "ክፍሉን ተቀላቅለዋል!", "balance": user['balance']})
 
 @app.route('/api/claim_bingo', methods=['POST'])
 def claim_bingo():
-    global users
-    users = load_data(USERS_FILE, {})
     data = request.json
     phone = data.get('phone')
     room_id = data.get('room_id')
@@ -497,7 +470,6 @@ def claim_bingo():
     winner_prize = total_pool * 0.75
     user['balance'] += winner_prize
     room['status'] = "finished"
-    save_data(USERS_FILE, users)
 
     return jsonify({"success": True, "message": f"🎉 BINGO! {winner_prize} ብር ባላንስዎ ላይ ተደምሯል!", "new_balance": user['balance']})
 
