@@ -4,7 +4,21 @@ from flask import Flask, render_template_string, jsonify, request
 
 app = Flask(__name__)
 
-# --- HTML TEMPLATE INLINED TO PREVENT FOLDER ERRORS ---
+# --- IN-MEMORY DATABASE ---
+# እዚህ ጋር ተጫዋቾች፣ ክፍሎች እና የአድሚን ጥያቄዎች ይቀመጣሉ
+users = {}  # ፎርማት: {"0911223344": {"phone": "0911223344", "balance": 0.0}}
+admin_telebirr = "0982289449"  # የአንተ የቴሌብር ቁጥር
+
+rooms = {
+    "room_20_5": {"id": "room_20_5", "name": "ባለ 20 ብር (5 ሰው)", "entry_fee": 20, "max_players": 5, "players": [], "status": "waiting"},
+    "room_30_5": {"id": "room_30_5", "name": "ባለ 30 ብር (5 ሰው)", "entry_fee": 30, "max_players": 5, "players": [], "status": "waiting"},
+    "room_40_5": {"id": "room_40_5", "name": "ባለ 40 ብር (5 ሰው)", "entry_fee": 40, "max_players": 5, "players": [], "status": "waiting"},
+    "room_30_10": {"id": "room_30_10", "name": "ባለ 30 ብር (10 ሰው)", "entry_fee": 30, "max_players": 10, "players": [], "status": "waiting"}
+}
+
+deposit_requests = []  # [{"id": 1, "phone": "...", "amount": 100, "screenshot": "...", "status": "pending"}]
+
+# --- HTML & FRONTEND (INLINED) ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="am">
@@ -24,77 +38,158 @@ HTML_TEMPLATE = """
             --btn-red: #f44336;
         }
         body { font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 12px; text-align: center; }
-        .header-card { background: var(--card-bg); padding: 15px; border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .card { background: var(--card-bg); padding: 15px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         .balance-box { font-size: 18px; font-weight: bold; color: var(--accent-color); }
         .section-title { font-size: 16px; margin: 15px 0 10px 0; text-align: left; border-left: 4px solid var(--accent-color); padding-left: 8px; }
         .rooms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .room-card { background: var(--card-bg); border: 1px solid #333; border-radius: 10px; padding: 12px; text-align: center; }
-        .room-card h4 { margin: 0 0 5px 0; }
+        .room-card h4 { margin: 0 0 5px 0; color: #fff; }
         .room-card p { margin: 0 0 8px 0; font-size: 12px; color: #aaa; }
         .btn { background-color: var(--btn-blue); color: white; border: none; padding: 10px; font-size: 14px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; }
         .btn-success { background-color: var(--btn-green); }
         .btn-danger { background-color: var(--btn-red); }
         .btn-bingo { background-color: var(--accent-color); font-size: 20px; padding: 15px; margin-top: 15px; }
+        input, select { width: 90%; padding: 10px; margin: 6px 0; border-radius: 6px; border: 1px solid #444; background: #121212; color: white; }
         .bingo-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-width: 350px; margin: 15px auto; background: #2a2a2a; padding: 8px; border-radius: 10px; }
         .bingo-cell { background: #1e1e1e; border: 1px solid #444; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border-radius: 6px; cursor: pointer; }
         .bingo-cell.marked { background-color: var(--btn-green); color: white; }
         .bingo-cell.free { background-color: var(--accent-color); color: black; font-size: 12px; }
-        .telebirr-box { background: var(--card-bg); padding: 15px; border-radius: 10px; margin-top: 15px; }
-        input { width: 90%; padding: 10px; margin: 6px 0; border-radius: 6px; border: 1px solid #444; background: #121212; color: white; }
     </style>
 </head>
 <body>
-    <div class="header-card">
-        <div><b>🎲 ET BINGO</b></div>
-        <div class="balance-box">💰 <span id="balance">100.00</span> ETB</div>
+
+    <!-- Registration Screen -->
+    <div id="reg-screen" class="card">
+        <h2>👋 እንኳን ወደ ET Bingo መጡ</h2>
+        <p>ለመጀመር ስልክ ቁጥርዎን ያስገቡ</p>
+        <input type="text" id="reg-phone" placeholder="ስልክ ቁጥር (ምሳሌ: 0911...)">
+        <button class="btn btn-success" onclick="registerUser()">ይመዝገቡ (Register)</button>
     </div>
 
-    <div id="game-section" style="display:none;">
-        <div style="background:#222; padding:10px; border-radius:8px; font-size:18px;">ወጣ ገባ ቁጥር፦ <span id="current-drawn-num">-</span></div>
-        <div class="bingo-board" id="bingo-board"></div>
-        <button class="btn btn-bingo" onclick="claimBingo()">🎉 BINGO!</button>
-    </div>
+    <!-- Main App Screen -->
+    <div id="main-screen" style="display:none;">
+        <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+            <div><b>🎲 ET BINGO</b></div>
+            <div class="balance-box">💰 <span id="balance">0.00</span> ETB</div>
+        </div>
 
-    <div id="rooms-section">
-        <div class="section-title">የጨዋታ ክፍሎች (Auto Rooms)</div>
-        <div class="rooms-grid">
-            <div class="room-card">
-                <h4>ባለ 20 ብር</h4>
-                <p>5 ተጫዋቾች</p>
-                <button class="btn" onclick="joinRoom('room_20_5')">ተቀላቀል</button>
+        <!-- Active Game Section -->
+        <div id="game-section" class="card" style="display:none;">
+            <div style="background:#222; padding:10px; border-radius:8px; font-size:18px; margin-bottom:10px;">
+                የወጣው ቁጥር፦ <span id="current-drawn-num" style="color:var(--accent-color); font-weight:bold;">-</span>
             </div>
-            <div class="room-card">
-                <h4>ባለ 30 ብር</h4>
-                <p>5 ተጫዋቾች</p>
-                <button class="btn" onclick="joinRoom('room_30_5')">ተቀላቀል</button>
-            </div>
-            <div class="room-card">
-                <h4>ባለ 40 ብር</h4>
-                <p>5 ተጫዋቾች</p>
-                <button class="btn" onclick="joinRoom('room_40_5')">ተቀላቀል</button>
-            </div>
-            <div class="room-card">
-                <h4>ባለ 30 ብር</h4>
-                <p>10 ተጫዋቾች</p>
-                <button class="btn" onclick="joinRoom('room_30_10')">ተቀላቀል</button>
+            <div class="bingo-board" id="bingo-board"></div>
+            <button class="btn btn-bingo" onclick="claimBingo()">🎉 BINGO!</button>
+        </div>
+
+        <!-- Rooms Section -->
+        <div id="rooms-section" class="card">
+            <div class="section-title">የጨዋታ ክፍሎች (Auto Rooms)</div>
+            <div class="rooms-grid">
+                <div class="room-card">
+                    <h4>ባለ 20 ብር</h4>
+                    <p>5 ተጫዋቾች</p>
+                    <button class="btn" onclick="joinRoom('room_20_5')">ተቀላቀል</button>
+                </div>
+                <div class="room-card">
+                    <h4>ባለ 30 ብር</h4>
+                    <p>5 ተጫዋቾች</p>
+                    <button class="btn" onclick="joinRoom('room_30_5')">ተቀላቀል</button>
+                </div>
+                <div class="room-card">
+                    <h4>ባለ 40 ብር</h4>
+                    <p>5 ተጫዋቾች</p>
+                    <button class="btn" onclick="joinRoom('room_40_5')">ተቀላቀል</button>
+                </div>
+                <div class="room-card">
+                    <h4>ባለ 30 ብር</h4>
+                    <p>10 ተጫዋቾች</p>
+                    <button class="btn" onclick="joinRoom('room_30_10')">ተቀላቀል</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="telebirr-box">
-        <div class="section-title" style="margin-top:0;">📲 የቴሌብር ሂሳብ አስገባ/አውጣ</div>
-        <input type="number" id="tb-amount" placeholder="የብር መጠን (ETB)">
-        <input type="text" id="tb-txid" placeholder="Transaction ID / ስልክ">
-        <div style="display: flex; gap: 8px; margin-top: 5px;">
-            <button class="btn btn-success" onclick="depositTelebirr()">ብር አስገባ</button>
-            <button class="btn btn-danger" onclick="withdrawTelebirr()">ብር አውጣ</button>
+        <!-- Telebirr Deposit Section -->
+        <div class="card">
+            <div class="section-title" style="margin-top:0;">📲 ቴሌብር ሂሳብ ማስገባት (Deposit)</div>
+            <p style="font-size: 13px; color: #aaa; text-align: left;">በዚህ የቴሌብር ቁጥር ብር ያስተላልፉ፦ <b style="color:var(--accent-color);">0982289449</b></p>
+            <input type="number" id="dep-amount" placeholder="የአስገቡት የብር መጠን">
+            <input type="file" id="dep-file" accept="image/*" style="background:none; border:none; color:white;">
+            <button class="btn btn-success" onclick="sendDepositRequest()">የክፍያ ማረጋገጫ ላክ</button>
         </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+
+        let currentUserPhone = localStorage.getItem('bingo_user_phone');
         let currentRoomId = null;
+
+        if (currentUserPhone) {
+            checkUserSession(currentUserPhone);
+        }
+
+        function registerUser() {
+            const phone = document.getElementById('reg-phone').value;
+            if(!phone) return alert('እባክዎን ስልክ ቁጥር ያስገቡ!');
+
+            fetch('/api/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: phone })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    localStorage.setItem('bingo_user_phone', phone);
+                    currentUserPhone = phone;
+                    document.getElementById('reg-screen').style.display = 'none';
+                    document.getElementById('main-screen').style.display = 'block';
+                    document.getElementById('balance').innerText = data.balance;
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        function checkUserSession(phone) {
+            fetch('/api/get_user?phone=' + phone)
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    document.getElementById('reg-screen').style.display = 'none';
+                    document.getElementById('main-screen').style.display = 'block';
+                    document.getElementById('balance').innerText = data.balance;
+                }
+            });
+        }
+
+        function sendDepositRequest() {
+            const amount = document.getElementById('dep-amount').value;
+            const fileInput = document.getElementById('dep-file');
+            if(!amount) return alert('እባክዎን የብር መጠኑን ያስገቡ!');
+
+            let reader = new FileReader();
+            if(fileInput.files[0]) {
+                reader.readAsDataURL(fileInput.files[0]);
+                reader.onload = function () {
+                    postDeposit(amount, reader.result);
+                };
+            } else {
+                postDeposit(amount, "");
+            }
+        }
+
+        function postDeposit(amount, imgData) {
+            fetch('/api/deposit', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: currentUserPhone, amount: amount, screenshot: imgData })
+            })
+            .then(res => res.json())
+            .then(data => alert(data.message));
+        }
 
         function generateBingoCard() {
             const board = document.getElementById('bingo-board');
@@ -125,12 +220,13 @@ HTML_TEMPLATE = """
             fetch('/api/join_room', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: 'user_1', room_id: roomId })
+                body: JSON.stringify({ phone: currentUserPhone, room_id: roomId })
             })
             .then(res => res.json())
             .then(data => {
                 alert(data.message);
                 if(data.success) {
+                    document.getElementById('balance').innerText = data.balance;
                     document.getElementById('rooms-section').style.display = 'none';
                     document.getElementById('game-section').style.display = 'block';
                     generateBingoCard();
@@ -143,7 +239,7 @@ HTML_TEMPLATE = """
             fetch('/api/claim_bingo', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: 'user_1', room_id: currentRoomId })
+                body: JSON.stringify({ phone: currentUserPhone, room_id: currentRoomId })
             })
             .then(res => res.json())
             .then(data => {
@@ -155,109 +251,183 @@ HTML_TEMPLATE = """
                 }
             });
         }
-
-        function depositTelebirr() {
-            const amt = document.getElementById('tb-amount').value;
-            const tx = document.getElementById('tb-txid').value;
-            if(!amt || !tx) return alert('መጠኑን እና Transaction ID ያስገቡ!');
-            fetch('/api/deposit', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: 'user_1', amount: amt, tx_id: tx })
-            }).then(res => res.json()).then(data => alert(data.message));
-        }
-
-        function withdrawTelebirr() {
-            const amt = document.getElementById('tb-amount').value;
-            const tx = document.getElementById('tb-txid').value;
-            if(!amt || !tx) return alert('መጠኑን እና ስልክ ቁጥር ያስገቡ!');
-            fetch('/api/withdraw', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: 'user_1', amount: amt, telebirr: tx })
-            }).then(res => res.json()).then(data => alert(data.message));
-        }
     </script>
 </body>
 </html>
 """
 
-# --- IN-MEMORY DATABASE ---
-users = {
-    "user_1": {"name": "Player 1", "balance": 100.0, "telebirr": "0911000000"}
-}
+# --- ADMIN PANEL TEMPLATE ---
+ADMIN_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <style>
+        body { font-family: sans-serif; background: #111; color: #fff; padding: 20px; }
+        .req-card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #ff9800; }
+        .btn { background: #4CAF50; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        img { max-width: 200px; border-radius: 5px; margin-top: 10px; display: block; }
+    </style>
+</head>
+<body>
+    <h2>🛠️ Admin Dashboard - Deposit Approvals</h2>
+    <div id="requests-container">ምንም አዲስ የዲፖዚት ጥያቄ የለም።</div>
 
-rooms = {
-    "room_20_5": {"id": "room_20_5", "name": "ባለ 20 ብር (5 ሰው)", "entry_fee": 20, "max_players": 5, "players": [], "status": "waiting"},
-    "room_30_5": {"id": "room_30_5", "name": "ባለ 30 ብር (5 ሰው)", "entry_fee": 30, "max_players": 5, "players": [], "status": "waiting"},
-    "room_40_5": {"id": "room_40_5", "name": "ባለ 40 ብር (5 ሰው)", "entry_fee": 40, "max_players": 5, "players": [], "status": "waiting"},
-    "room_30_10": {"id": "room_30_10", "name": "ባለ 30 ብር (10 ሰው)", "entry_fee": 30, "max_players": 10, "players": [], "status": "waiting"}
-}
+    <script>
+        function loadRequests() {
+            fetch('/api/admin/requests')
+            .then(res => res.json())
+            .then(data => {
+                const container = document.getElementById('requests-container');
+                if(data.requests.length === 0) return;
+                container.innerHTML = '';
+                data.requests.forEach(req => {
+                    container.innerHTML += `
+                        <div class="req-card">
+                            <p><b>ስልክ ቁጥር፦</b> ${req.phone}</p>
+                            <p><b>የጠየቀው ብር፦</b> ${req.amount} ETB</p>
+                            ${req.screenshot ? `<a href="${req.screenshot}" target="_blank"><img src="${req.screenshot}"></a>` : '<p>ስክሪንሻት የለም</p>'}
+                            <br>
+                            <button class="btn" onclick="approveDeposit(${req.id})">Approve (አረጋግጥ)</button>
+                        </div>
+                    `;
+                });
+            });
+        }
 
-deposit_requests = []
-withdrawal_requests = []
+        function approveDeposit(reqId) {
+            fetch('/api/admin/approve', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ req_id: reqId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message);
+                loadRequests();
+            });
+        }
+
+        loadRequests();
+    </script>
+</body>
+</html>
+"""
+
+# --- BACKEND API ROUTES ---
 
 @app.route('/')
 def index():
     return render_template_string(HTML_TEMPLATE)
 
+@app.route('/admin')
+def admin_page():
+    return render_template_string(ADMIN_TEMPLATE)
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    phone = data.get('phone')
+    if not phone:
+        return jsonify({"success": False, "message": "ስልክ ቁጥር አልተገኘም!"})
+
+    if phone not in users:
+        users[phone] = {"phone": phone, "balance": 0.0}
+
+    return jsonify({"success": True, "balance": users[phone]["balance"]})
+
+@app.route('/api/get_user', methods=['GET'])
+def get_user():
+    phone = request.args.get('phone')
+    if phone in users:
+        return jsonify({"success": True, "balance": users[phone]["balance"]})
+    return jsonify({"success": False}), 404
+
+@app.route('/api/deposit', methods=['POST'])
+def deposit():
+    data = request.json
+    phone = data.get('phone')
+    amount = float(data.get('amount', 0))
+    screenshot = data.get('screenshot', '')
+
+    req_id = len(deposit_requests) + 1
+    deposit_requests.append({
+        "id": req_id,
+        "phone": phone,
+        "amount": amount,
+        "screenshot": screenshot,
+        "status": "pending"
+    })
+    return jsonify({"success": True, "message": "የክፍያ ማረጋገጫዎ ለአድሚን ተልኳል! ሲታረም ባላንስዎ ይጨመራል።"})
+
+@app.route('/api/admin/requests', methods=['GET'])
+def admin_requests():
+    pending = [r for r in deposit_requests if r["status"] == "pending"]
+    return jsonify({"requests": pending})
+
+@app.route('/api/admin/approve', methods=['POST'])
+def admin_approve():
+    data = request.json
+    req_id = data.get('req_id')
+
+    for req in deposit_requests:
+        if req["id"] == req_id and req["status"] == "pending":
+            req["status"] = "approved"
+            phone = req["phone"]
+            amount = req["amount"]
+            if phone in users:
+                users[phone]["balance"] += amount
+            return jsonify({"success": True, "message": "በስኬት አጸድቀዋል! ብሩ ተደምሯል።"})
+
+    return jsonify({"success": False, "message": "ጥያቄው አልተገኘም!"}), 404
+
 @app.route('/api/join_room', methods=['POST'])
 def join_room():
     data = request.json
-    user_id = data.get('user_id')
+    phone = data.get('phone')
     room_id = data.get('room_id')
-    user = users.get(user_id)
+
+    user = users.get(phone)
     room = rooms.get(room_id)
 
     if not user or not room:
         return jsonify({"success": False, "message": "መረጃው አልተገኘም!"}), 404
 
+    # የባላንስ ማረጋገጫ (Balance Validation)
     if user['balance'] < room['entry_fee']:
-        return jsonify({"success": False, "message": "ለዚህ ክፍል በቂ ባላንስ የለህም!"}), 400
+        return jsonify({"success": False, "message": f"በቂ ባላንስ የለዎትም! (የሚጠበቀው: {room['entry_fee']} ብር፣ ያሎት: {user['balance']} ብር)"}), 400
 
-    if user_id in room['players']:
-        return jsonify({"success": True, "message": "ቀድመህ ገብተሃል!"})
+    if phone in room['players']:
+        return jsonify({"success": True, "message": "ቀድመው ገብተዋል!", "balance": user['balance']})
 
-    room['players'].append(user_id)
+    room['players'].append(phone)
 
+    # ቁጥሩ ሲሞላ አውቶማቲክ ብር መቁረጥ እና መጀመር
     if len(room['players']) == room['max_players']:
         room['status'] = "playing"
-        for pid in room['players']:
-            users[pid]['balance'] -= room['entry_fee']
+        for p in room['players']:
+            users[p]['balance'] -= room['entry_fee']
 
-    return jsonify({"success": True, "message": "ክፍሉን በስኬት ተቀላቅለሃል!"})
+    return jsonify({"success": True, "message": "ክፍሉን ተቀላቅለዋል!", "balance": user['balance']})
 
 @app.route('/api/claim_bingo', methods=['POST'])
 def claim_bingo():
     data = request.json
-    user_id = data.get('user_id')
+    phone = data.get('phone')
     room_id = data.get('room_id')
     room = rooms.get(room_id)
-    user = users.get(user_id)
+    user = users.get(phone)
+
+    if not room or not user:
+        return jsonify({"success": False, "message": "ስህተት ተፈጥሯል!"}), 400
 
     total_pool = room['entry_fee'] * room['max_players']
     winner_prize = total_pool * 0.75
     user['balance'] += winner_prize
+    room['status'] = "finished"
 
-    return jsonify({"success": True, "message": f"🎉 BINGO! {winner_prize} ብር ተደምሮልሃል!", "new_balance": user['balance']})
-
-@app.route('/api/deposit', methods=['POST'])
-def deposit():
-    data = request.json
-    deposit_requests.append({"user_id": data.get('user_id'), "amount": float(data.get('amount')), "tx_id": data.get('tx_id')})
-    return jsonify({"success": True, "message": "የገቢ ጥያቄህ ለአድሚን ተልኳል!"})
-
-@app.route('/api/withdraw', methods=['POST'])
-def withdraw():
-    data = request.json
-    user_id = data.get('user_id')
-    amount = float(data.get('amount'))
-    user = users.get(user_id)
-    if user['balance'] < amount:
-        return jsonify({"success": False, "message": "በቂ ባላንስ የለህም!"}), 400
-    user['balance'] -= amount
-    withdrawal_requests.append({"user_id": user_id, "amount": amount, "telebirr": data.get('telebirr')})
-    return jsonify({"success": True, "message": "የወጪ ጥያቄህ ተልኳል!"})
+    return jsonify({"success": True, "message": f"🎉 BINGO! {winner_prize} ብር ባላንስዎ ላይ ተደምሯል!", "new_balance": user['balance']})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
