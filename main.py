@@ -57,6 +57,7 @@ HTML_TEMPLATE = """
 </head>
 <body>
 
+    <!-- Registration Screen -->
     <div id="reg-screen" class="card">
         <h2>👋 እንኳን ወደ ET Bingo መጡ</h2>
         <p>ለመጀመር ስልክ ቁጥርዎን ያስገቡ</p>
@@ -64,12 +65,14 @@ HTML_TEMPLATE = """
         <button class="btn btn-success" onclick="registerUser()">ይመዝገቡ (Register)</button>
     </div>
 
+    <!-- Main App Screen -->
     <div id="main-screen" style="display:none;">
         <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
             <div><b>🎲 ET BINGO</b></div>
             <div class="balance-box">💰 <span id="balance">0.00</span> ETB</div>
         </div>
 
+        <!-- Active Game Section -->
         <div id="game-section" class="card" style="display:none;">
             <div style="background:#222; padding:10px; border-radius:8px; font-size:18px; margin-bottom:10px;">
                 የወጣው ቁጥር፦ <span id="current-drawn-num" style="color:var(--accent-color); font-weight:bold;">-</span>
@@ -78,6 +81,7 @@ HTML_TEMPLATE = """
             <button class="btn btn-bingo" onclick="claimBingo()">🎉 BINGO!</button>
         </div>
 
+        <!-- Rooms Section -->
         <div id="rooms-section" class="card">
             <div class="section-title">የጨዋታ ክፍሎች (Auto Rooms)</div>
             <div class="rooms-grid">
@@ -104,6 +108,7 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
+        <!-- Telebirr Deposit Section -->
         <div class="card">
             <div class="section-title" style="margin-top:0;">📲 ቴሌብር ሂሳብ ማስገባት (Deposit)</div>
             <p style="font-size: 13px; color: #aaa; text-align: left;">በዚህ የቴሌብር ቁጥር ብር ያስተላልፉ፦ <b style="color:var(--accent-color);">0982289449</b></p>
@@ -250,7 +255,7 @@ HTML_TEMPLATE = """
 </html>
 """
 
-# --- ADMIN PANEL TEMPLATE (ENHANCED) ---
+# --- ADMIN PANEL TEMPLATE ---
 ADMIN_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="am">
@@ -269,11 +274,13 @@ ADMIN_TEMPLATE = """
 <body>
     <h2>🛠️ Admin Dashboard</h2>
 
+    <!-- Deposit Requests Section -->
     <div class="section">
         <h3>📥 የዲፖዚት ጥያቄዎች (Deposit Requests)</h3>
         <div id="requests-container">ምንም አዲስ የዲፖዚት ጥያቄ የለም።</div>
     </div>
 
+    <!-- Registered Users Section -->
     <div class="section">
         <h3>👥 የተመዝጋቢዎች ዝርዝር (All Registered Users)</h3>
         <div id="users-container">ምንም ተመዝጋቢ የለም።</div>
@@ -339,7 +346,7 @@ ADMIN_TEMPLATE = """
         }
 
         loadAdminData();
-        setInterval(loadAdminData, 5000); // Refresh every 5 seconds
+        setInterval(loadAdminData, 5000);
     </script>
 </body>
 </html>
@@ -464,4 +471,4 @@ def claim_bingo():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True)
