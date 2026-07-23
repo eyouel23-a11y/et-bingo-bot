@@ -59,7 +59,7 @@ HTML_TEMPLATE = """
 <body>
 
     <!-- Registration Screen -->
-    <div id="reg-screen" class="card">
+    <div id="reg-screen" class="card" style="display:none;">
         <h2>👋 እንኳን ወደ ET Bingo መጡ</h2>
         <p>ለመጀመር ስልክ ቁጥርዎን ያስገቡ</p>
         <input type="text" id="reg-phone" placeholder="ስልክ ቁጥር (ምሳሌ: 0911...)">
@@ -133,8 +133,12 @@ HTML_TEMPLATE = """
         let currentUserPhone = localStorage.getItem('bingo_user_phone');
         let currentRoomId = null;
 
+        // Check if user is already registered in localStorage and backend
         if (currentUserPhone) {
             checkUserSession(currentUserPhone);
+        } else {
+            // Show registration screen if no phone found locally
+            document.getElementById('reg-screen').style.display = 'block';
         }
 
         function registerUser() {
@@ -161,14 +165,22 @@ HTML_TEMPLATE = """
         }
 
         function checkUserSession(phone) {
-            fetch('/api/get_user?phone=' + phone)
+            fetch('/api/get_user?phone=' + encodeURIComponent(phone))
             .then(res => res.json())
             .then(data => {
                 if(data.success) {
+                    // User exists, skip registration and go straight to rooms/main screen
                     document.getElementById('reg-screen').style.display = 'none';
                     document.getElementById('main-screen').style.display = 'block';
                     document.getElementById('balance').innerText = data.balance;
+                } else {
+                    // If user was cleared from server memory (e.g., restart), force re-register
+                    localStorage.removeItem('bingo_user_phone');
+                    document.getElementById('reg-screen').style.display = 'block';
                 }
+            })
+            .catch(() => {
+                document.getElementById('reg-screen').style.display = 'block';
             });
         }
 
@@ -284,12 +296,12 @@ ADMIN_TEMPLATE = """
 
     <div class="section">
         <h3>📥 የዲፖዚት ጥያቄዎች (Deposit Requests)</h3>
-        <div id="requests-container">ምንም አዲስ የዲፖዚት ጥያቄ የለም።</div>
+        <div id="requests-container">መረጃ በመጫን ላይ...</div>
     </div>
 
     <div class="section">
         <h3>👥 የተመዝጋቢዎች ዝርዝር (All Registered Users)</h3>
-        <div id="users-container">ምንም ተመዝጋቢ የለም።</div>
+        <div id="users-container">መረጃ በመጫን ላይ...</div>
     </div>
 
     <script>
@@ -298,7 +310,7 @@ ADMIN_TEMPLATE = """
             .then(res => res.json())
             .then(data => {
                 const container = document.getElementById('requests-container');
-                if(data.requests.length === 0) {
+                if(!data.requests || data.requests.length === 0) {
                     container.innerHTML = 'ምንም አዲስ የዲፖዚት ጥያቄ የለም።';
                 } else {
                     container.innerHTML = '';
@@ -314,13 +326,15 @@ ADMIN_TEMPLATE = """
                         `;
                     });
                 }
+            }).catch(err => {
+                console.error('Error loading requests:', err);
             });
 
             fetch('/api/admin/users')
             .then(res => res.json())
             .then(data => {
                 const container = document.getElementById('users-container');
-                if(data.users.length === 0) {
+                if(!data.users || data.users.length === 0) {
                     container.innerHTML = 'ምንም ተመዝጋቢ የለም።';
                 } else {
                     container.innerHTML = '';
@@ -333,6 +347,8 @@ ADMIN_TEMPLATE = """
                         `;
                     });
                 }
+            }).catch(err => {
+                console.error('Error loading users:', err);
             });
         }
 
@@ -356,7 +372,14 @@ ADMIN_TEMPLATE = """
 </html>
 """
 
-# --- BACKEND API ROUTES ---
+# --- BACKEND API ROUTES & CORS HEADERS ---
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+    return response
 
 @app.route('/')
 def index():
@@ -366,8 +389,10 @@ def index():
 def admin_page():
     return render_template_string(ADMIN_TEMPLATE)
 
-@app.route('/api/register', methods=['POST'])
+@app.route('/api/register', methods=['POST', 'OPTIONS'])
 def register():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
     data = request.json
     phone = data.get('phone')
     if not phone:
@@ -385,8 +410,10 @@ def get_user():
         return jsonify({"success": True, "balance": users[phone]["balance"]})
     return jsonify({"success": False}), 404
 
-@app.route('/api/deposit', methods=['POST'])
+@app.route('/api/deposit', methods=['POST', 'OPTIONS'])
 def deposit():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
     data = request.json
     phone = data.get('phone')
     amount = float(data.get('amount', 0))
@@ -412,8 +439,10 @@ def admin_users():
     all_users = list(users.values())
     return jsonify({"users": all_users})
 
-@app.route('/api/admin/approve', methods=['POST'])
+@app.route('/api/admin/approve', methods=['POST', 'OPTIONS'])
 def admin_approve():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
     data = request.json
     req_id = data.get('req_id')
 
@@ -428,8 +457,10 @@ def admin_approve():
 
     return jsonify({"success": False, "message": "ጥያቄው አልተገኘም!"}), 404
 
-@app.route('/api/join_room', methods=['POST'])
+@app.route('/api/join_room', methods=['POST', 'OPTIONS'])
 def join_room():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
     data = request.json
     phone = data.get('phone')
     room_id = data.get('room_id')
@@ -455,8 +486,10 @@ def join_room():
 
     return jsonify({"success": True, "message": "ክፍሉን ተቀላቅለዋል!", "balance": user['balance']})
 
-@app.route('/api/claim_bingo', methods=['POST'])
+@app.route('/api/claim_bingo', methods=['POST', 'OPTIONS'])
 def claim_bingo():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
     data = request.json
     phone = data.get('phone')
     room_id = data.get('room_id')
