@@ -3,324 +3,389 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ET Bingo Mini App</title>
+    <title>ET BINGO</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root {
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
-            --accent-color: #ff9800;
-            --text-color: #ffffff;
-            --btn-blue: #2481cc;
-            --btn-green: #4CAF50;
-            --btn-red: #f44336;
-        }
+        body { font-family: sans-serif; background: #1c1c1e; color: white; margin: 0; padding: 12px; text-align: center; }
+        .hidden { display: none !important; }
+        .card { background: #2c2c2e; padding: 12px; border-radius: 12px; margin-bottom: 12px; }
+        input { width: 80%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #444; background: #1c1c1e; color: white; }
+        button { padding: 12px 20px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: #2ecc71; color: white; }
+        button:disabled { background: #555 !important; color: #888 !important; cursor: not-allowed; }
+        .btn-join { background: #e67e22; color: white; width: 100%; max-width: 340px; padding: 15px; font-size: 18px; margin-bottom: 10px; border-radius: 10px; }
+        .btn-new-game { background: #3498db; color: white; width: 100%; max-width: 340px; padding: 15px; font-size: 16px; margin-top: 10px; }
+        .status-badge { background: #3a3a3c; padding: 6px 12px; border-radius: 20px; display: inline-block; font-size: 13px; margin-bottom: 8px; color: #f1c40f; }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 12px;
-            text-align: center;
-        }
+        .prize-card { background: linear-gradient(135deg, #f39c12, #d35400); padding: 10px; border-radius: 10px; margin-bottom: 10px; font-weight: bold; }
 
-        .header-card {
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        .called-num-ball { width: 70px; height: 70px; border-radius: 50%; background: radial-gradient(circle at 25px 25px, #f39c12, #d35400); color: white; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: bold; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 3px solid #fff; }
+        .balls-history { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0; justify-content: flex-start; scrollbar-width: none; }
+        .small-ball { min-width: 38px; height: 38px; border-radius: 50%; background: radial-gradient(circle at 12px 12px, #2ecc71, #27ae60); color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid #fff; }
 
-        .balance-box {
-            font-size: 18px;
-            font-weight: bold;
-            color: var(--accent-color);
-        }
-
-        .section-title {
-            font-size: 16px;
-            margin: 15px 0 10px 0;
-            text-align: left;
-            border-left: 4px solid var(--accent-color);
-            padding-left: 8px;
-        }
-
-        .rooms-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .room-card {
-            background: var(--card-bg);
-            border: 1px solid #333;
-            border-radius: 10px;
-            padding: 12px;
-            text-align: center;
-        }
-
-        .room-card h4 { margin: 0 0 5px 0; color: #fff; }
-        .room-card p { margin: 0 0 8px 0; font-size: 12px; color: #aaa; }
-
-        .btn {
-            background-color: var(--btn-blue);
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            font-size: 14px;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-
-        .btn:active { transform: scale(0.98); }
-        .btn-success { background-color: var(--btn-green); }
-        .btn-danger { background-color: var(--btn-red); }
-        .btn-bingo { 
-            background-color: var(--accent-color); 
-            font-size: 20px; 
-            padding: 15px; 
-            margin-top: 15px;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.03); }
-            100% { transform: scale(1); }
-        }
-
-        /* 5x5 BINGO BOARD */
-        .bingo-board {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 6px;
-            max-width: 350px;
-            margin: 15px auto;
-            background: #2a2a2a;
-            padding: 8px;
-            border-radius: 10px;
-        }
-
-        .bingo-cell {
-            background: #1e1e1e;
-            border: 1px solid #444;
-            aspect-ratio: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .bingo-cell.marked {
-            background-color: var(--btn-green);
-            color: white;
-        }
-
-        .bingo-cell.free {
-            background-color: var(--accent-color);
-            color: black;
-            font-size: 12px;
-        }
-
-        /* TELEBIRR SECTION */
-        .telebirr-box {
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
-        }
-
-        input {
-            width: 90%;
-            padding: 10px;
-            margin: 6px 0;
-            border-radius: 6px;
-            border: 1px solid #444;
-            background: #121212;
-            color: white;
-        }
-
-        .drawn-container {
-            background: #222;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            font-size: 18px;
-            font-weight: bold;
-            color: var(--accent-color);
-        }
+        .board-header { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-width: 340px; margin: 0 auto 5px auto; font-weight: bold; font-size: 18px; color: #f1c40f; }
+        .board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-width: 340px; margin: 0 auto 10px auto; }
+        .cell { aspect-ratio: 1; background: #3a3a3c; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; cursor: pointer; user-select: none; }
+        .cell.marked { background: #e74c3c; }
+        .cell.disabled-cell { opacity: 0.4; pointer-events: none; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; z-index: 1000; }
+        .success-box { background: #27ae60; color: white; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <div class="header-card">
-        <div><b>🎲 ET BINGO</b></div>
-        <div class="balance-box">💰 <span id="balance">100.00</span> ETB</div>
+    <div id="regSection" class="card hidden">
+        <h2>ምዝገባ 📝</h2>
+        <p>ለመጫወት እባክዎ አስቀድመው ይወዝገቡ</p>
+        <input type="text" id="regName" placeholder="ሙሉ ስም"><br>
+        <input type="tel" id="regPhone" placeholder="ስልክ ቁጥር"><br>
+        <button onclick="registerUser()">ተመዝገብ</button>
     </div>
 
-    <!-- Active Game / Drawn Number Display -->
-    <div id="game-section" style="display:none;">
-        <div class="drawn-container">
-            የወጣው ቁጥር፦ <span id="current-drawn-num">-</span>
+    <div id="gameSection" class="hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#2c2c2e; padding:10px 15px; border-radius:10px; margin-bottom:8px;">
+            <div>👤 <span id="dispName">--</span></div>
+            <div>💰 ባላንስ፦ <span id="dispBalance" style="color:#2ecc71; font-weight:bold;">0</span> ETB</div>
         </div>
 
-        <!-- 5x5 Bingo Card -->
-        <div class="bingo-board" id="bingo-board"></div>
+        <div style="font-size:12px; color:#aaa;">Game ID: #<span id="gameId">--</span> | መደብ፦ <b style="color:#2ecc71;" id="dispFee">--</b> ETB</div>
+        <div class="status-badge" id="gameStatusText">🔄 አድሚኑ ጨዋታውን እስኪጀምር ይበቁ...</div>
 
-        <button class="btn btn-bingo" onclick="claimBingo()">🎉 BINGO!</button>
-    </div>
+        <div class="prize-card">
+            👥 ተሳታፊዎች፦ <span id="playerCount">0</span> ሰው | 🏆 የዚህ ጨዋታ አሸናፊ፦ <span id="prizeDisplay" style="font-size: 20px;">0</span> ETB
+        </div>
 
-    <!-- Rooms Selection -->
-    <div id="rooms-section">
-        <div class="section-title">የጨዋታ ክፍሎች (Auto Rooms)</div>
-        <div class="rooms-grid">
-            <div class="room-card">
-                <h4>ባለ 20 ብር</h4>
-                <p>5 ተጫዋቾች</p>
-                <button class="btn" onclick="joinRoom('room_20_5')">ተቀላቀል</button>
+        <div id="joinContainer">
+            <button id="joinBtn" class="btn-join" onclick="joinGame()">🎮 በጨዋታው ተሳተፍ (Join Game)</button>
+        </div>
+        <div id="joinedStatus" class="success-box hidden">✅ በጨዋታው ተመዝግበዋል! ጨዋታው ሲጀመር ይከፈታል።</div>
+
+        <!-- Deposit request section -->
+        <div class="card" id="depositSection" style="text-align:left; border:1px solid #444;">
+            <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleDeposit()">
+                <b>💳 ባላንስ ጨምር (Deposit Request)</b>
+                <span id="depositArrow" style="font-size:18px;">▼</span>
             </div>
-            <div class="room-card">
-                <h4>ባለ 30 ብር</h4>
-                <p>5 ተጫዋቾች</p>
-                <button class="btn" onclick="joinRoom('room_30_5')">ተቀላቀል</button>
-            </div>
-            <div class="room-card">
-                <h4>ባለ 40 ብር</h4>
-                <p>5 ተጫዋቾች</p>
-                <button class="btn" onclick="joinRoom('room_40_5')">ተቀላቀል</button>
-            </div>
-            <div class="room-card">
-                <h4>ባለ 30 ብር</h4>
-                <p>10 ተጫዋቾች</p>
-                <button class="btn" onclick="joinRoom('room_30_10')">ተቀላቀል</button>
+            <div id="depositForm" style="display:none; margin-top:10px;">
+                <input type="number" id="depAmount" placeholder="የሚፈልጉት ብር (ETB)" style="width:100%; margin-bottom:6px;">
+                <input type="text" id="depNote" placeholder="ማስታወሻ (ለምሳሌ: ስልክ ቁጥር ወይም ትዕዛዝ)" style="width:100%; margin-bottom:8px;">
+                <button onclick="submitDepositRequest()" style="width:100%; background:#3498db;">📤 ጥያቄ ላክ ለአድሚን</button>
+                <div id="depMsg" style="margin-top:6px; font-size:13px; color:#2ecc71;"></div>
             </div>
         </div>
+
+        <div class="card">
+            <div style="font-size: 13px; color: #aaa; margin-bottom: 5px;">የተጠራው ጥሪ፦</div>
+            <div class="called-num-ball" id="currentNum">--</div>
+            <div style="font-size: 12px; color: #aaa; margin-top: 8px; text-align: left;">ያለፉት ጥሪዎች፦</div>
+            <div class="balls-history" id="ballsHistory"></div>
+        </div>
+
+        <div class="board-header">
+            <div>B</div><div>I</div><div>N</div><div>G</div><div>O</div>
+        </div>
+        <div class="board disabled-cell" id="board"></div>
+
+        <button id="bingoBtn" onclick="claimBingo()" disabled style="width:100%; max-width:340px; padding:15px; font-size:18px;">BINGO! 🎯</button>
+        <button id="newGameBtn" class="btn-new-game hidden" onclick="resetForNewGame()">🔄 ለቀጣይ ጨዋታ ተዘጋጅ (New Game)</button>
     </div>
 
-    <!-- Telebirr Deposit/Withdraw -->
-    <div class="telebirr-box">
-        <div class="section-title" style="margin-top:0;">📲 የቴሌብር ሂሳብ አስገባ/አውጣ</div>
-        <input type="number" id="tb-amount" placeholder="የብር መጠን (ETB)">
-        <input type="text" id="tb-txid" placeholder="Transaction ID (ለገቢ) / ስልክ (ለውጪ)">
-        <div style="display: flex; gap: 8px; margin-top: 5px;">
-            <button class="btn btn-success" onclick="depositTelebirr()">ብር አስገባ</button>
-            <button class="btn btn-danger" onclick="withdrawTelebirr()">ብር አውጣ</button>
+    <div class="modal" id="winModal">
+        <div style="background:#2c2c2e; padding:25px; border-radius:15px; max-width:80%;">
+            <h1 id="winTitle" style="color:#f1c40f;">🏆 BINGO!</h1>
+            <p id="winMessage" style="font-size:16px; margin-bottom: 20px;"></p>
+            <button onclick="closeModalAndPrepare()">እሺ (OK)</button>
         </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+        const tgUser = tg.initDataUnsafe?.user;
+        const tgId = tgUser?.id || 99988877; 
+        let currentUser = null;
+        let gameEnded = false;
+        let calledNumbersList = [];
+        let currentBoardState = [];
+        let isJoined = false;
 
-        let currentRoomId = null;
+        function getRandomSample(min, max, count) {
+            let arr = [];
+            for (let i = min; i <= max; i++) arr.push(i);
+            arr.sort(() => Math.random() - 0.5);
+            return arr.slice(0, count);
+        }
 
-        // Generate Bingo Card (5x5)
-        function generateBingoCard() {
-            const board = document.getElementById('bingo-board');
-            board.innerHTML = '';
+        function generateStandardBingoBoard() {
+            const cols = {
+                b: getRandomSample(1, 15, 5),
+                i: getRandomSample(16, 30, 5),
+                n: getRandomSample(31, 45, 4),
+                g: getRandomSample(46, 60, 5),
+                o: getRandomSample(61, 75, 5)
+            };
 
-            let nums = [];
-            while(nums.length < 24) {
-                let r = Math.floor(Math.random() * 75) + 1;
-                if(!nums.includes(r)) nums.push(r);
-            }
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            currentBoardState = [];
 
-            let cellCount = 0;
-            for(let i=0; i<25; i++) {
-                const cell = document.createElement('div');
-                cell.classList.add('bingo-cell');
+            for (let row = 0; row < 5; row++) {
+                currentBoardState.push(cols.b[row]);
+                currentBoardState.push(cols.i[row]);
 
-                if(i === 12) { // Center Free Space
-                    cell.innerText = 'FREE';
-                    cell.classList.add('free', 'marked');
+                if (row === 2) {
+                    currentBoardState.push('FREE');
                 } else {
-                    cell.innerText = nums[cellCount];
-                    cellCount++;
-                    cell.onclick = function() {
-                        cell.classList.toggle('marked');
-                    };
+                    const nVal = row > 2 ? cols.n[row - 1] : cols.n[row];
+                    currentBoardState.push(nVal);
                 }
-                board.appendChild(cell);
+
+                currentBoardState.push(cols.g[row]);
+                currentBoardState.push(cols.o[row]);
+            }
+
+            currentBoardState.forEach((val, idx) => {
+                createCell(boardEl, val, idx, val === 'FREE');
+            });
+        }
+
+        function createCell(parent, val, index, isFree = false) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.dataset.index = index;
+            cell.innerText = val;
+
+            if (isFree) {
+                cell.classList.add('marked');
+            } else {
+                cell.onclick = () => {
+                    if (!isJoined) {
+                        alert("❌ በቅድሚያ 'Join Game' የሚለውን በመጫን በጨዋታው ይሳተፉ!");
+                        return;
+                    }
+
+                    const isCalled = calledNumbersList.some(call => {
+                        const numOnly = parseInt(call.split('-')[1] || call);
+                        return numOnly === val;
+                    });
+
+                    if (isCalled) {
+                        cell.classList.toggle('marked');
+                    } else {
+                        tg.HapticFeedback?.notificationOccurred('error');
+                        alert(`❌ ጥሪ ${val} ገና አልተጠራም! መጠራቱን ይጠብቁ።`);
+                    }
+                };
+            }
+            parent.appendChild(cell);
+        }
+
+        async function checkUser() {
+            const res = await fetch('/api/check_user', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegram_id: tgId })
+            });
+            const data = await res.json();
+
+            if (data.registered) {
+                currentUser = data;
+                isJoined = data.has_joined;
+                document.getElementById('dispName').innerText = data.name;
+                document.getElementById('dispBalance').innerText = data.balance;
+                document.getElementById('regSection').classList.add('hidden');
+                document.getElementById('gameSection').classList.remove('hidden');
+
+                generateStandardBingoBoard();
+                setInterval(checkStatus, 1000);
+            } else {
+                document.getElementById('regSection').classList.remove('hidden');
             }
         }
 
-        // API Calls
-        function joinRoom(roomId) {
-            currentRoomId = roomId;
-            fetch('/api/join_room', {
+        async function registerUser() {
+            const name = document.getElementById('regName').value;
+            const phone = document.getElementById('regPhone').value;
+            if(!name || !phone) return alert("እባክዎ ስም እና ስልክ ቁጥር ያስገቡ!");
+
+            const res = await fetch('/api/register', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: 'user_1', room_id: roomId })
-            })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.message);
-                if(data.success) {
-                    document.getElementById('rooms-section').style.display = 'none';
-                    document.getElementById('game-section').style.display = 'block';
-                    generateBingoCard();
-                }
+                body: JSON.stringify({ telegram_id: tgId, name: name, phone: phone })
             });
-        }
-
-        function claimBingo() {
-            if(!currentRoomId) return;
-            fetch('/api/claim_bingo', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: 'user_1', room_id: currentRoomId })
-            })
-            .then(res => res.json())
-            .then(data => {
+            const data = await res.json();
+            if(data.status === 'success') {
+                checkUser();
+            } else {
                 alert(data.message);
-                if(data.success) {
-                    document.getElementById('balance').innerText = data.new_balance;
-                    document.getElementById('game-section').style.display = 'none';
-                    document.getElementById('rooms-section').style.display = 'block';
-                }
+            }
+        }
+
+        async function joinGame() {
+            const res = await fetch('/api/join_game', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ telegram_id: tgId })
             });
+            const data = await res.json();
+
+            if (data.status === 'success') {
+                isJoined = true;
+                alert("🎉 " + data.message);
+                checkUser();
+            } else {
+                alert(data.message);
+            }
         }
 
-        function depositTelebirr() {
-            const amt = document.getElementById('tb-amount').value;
-            const tx = document.getElementById('tb-txid').value;
-            if(!amt || !tx) return alert('እባክዎን መጠኑን እና Transaction ID ያስገቡ!');
+        async function checkStatus() {
+            try {
+                const res = await fetch('/api/game_status');
+                const data = await res.json();
 
-            fetch('/api/deposit', {
+                document.getElementById('gameId').innerText = data.game_id;
+                document.getElementById('dispFee').innerText = data.entry_fee;
+                document.getElementById('playerCount').innerText = data.joined_count;
+                document.getElementById('prizeDisplay').innerText = data.prize_amount;
+
+                isJoined = data.joined_players.includes(tgId);
+
+                const joinContainer = document.getElementById('joinContainer');
+                const joinedStatus = document.getElementById('joinedStatus');
+                const boardEl = document.getElementById('board');
+                const bingoBtn = document.getElementById('bingoBtn');
+                const newGameBtn = document.getElementById('newGameBtn');
+                const statusText = document.getElementById('gameStatusText');
+
+                if (isJoined) {
+                    joinContainer.classList.add('hidden');
+                    joinedStatus.classList.remove('hidden');
+                } else {
+                    joinContainer.classList.remove('hidden');
+                    joinedStatus.classList.add('hidden');
+                }
+
+                calledNumbersList = data.called_numbers || [];
+                let patternText = data.pattern === 'any_line' ? '1 መስመር' : (data.pattern === 'two_lines' ? '2 መስመር' : 'Full House (ሙሉ ቦርድ)');
+
+                if (data.status === 'waiting') {
+                    statusText.innerText = `🔄 አድሚኑ ጨዋታውን እስኪጀምር ይበቁ... (ህግ፦ ${patternText})`;
+                    bingoBtn.disabled = true;
+                    boardEl.classList.add('disabled-cell');
+                    newGameBtn.classList.add('hidden');
+                    gameEnded = false;
+                } else if (data.status === 'running') {
+                    statusText.innerText = `🟢 ጨዋታው በሂደት ላይ ነው! (ህግ፦ ${patternText})`;
+                    if (isJoined) {
+                        bingoBtn.disabled = false;
+                        boardEl.classList.remove('disabled-cell');
+                    } else {
+                        bingoBtn.disabled = true;
+                        boardEl.classList.add('disabled-cell');
+                    }
+                    newGameBtn.classList.add('hidden');
+                } else if (data.status === 'ended' && !gameEnded) {
+                    gameEnded = true;
+                    bingoBtn.disabled = true;
+                    boardEl.classList.add('disabled-cell');
+                    newGameBtn.classList.remove('hidden');
+                    showWinnerModal(data.winner, data.winning_number, data.prize_amount);
+                }
+
+                if (data.called_numbers.length > 0) {
+                    const lastCall = data.called_numbers[data.called_numbers.length - 1];
+                    document.getElementById('currentNum').innerText = lastCall;
+
+                    const historyEl = document.getElementById('ballsHistory');
+                    historyEl.innerHTML = '';
+                    [...data.called_numbers].reverse().forEach(num => {
+                        const b = document.createElement('div');
+                        b.classList.add('small-ball');
+                        b.innerText = num;
+                        historyEl.appendChild(b);
+                    });
+                } else {
+                    document.getElementById('currentNum').innerText = '--';
+                    document.getElementById('ballsHistory').innerHTML = '';
+                }
+            } catch (e) {}
+        }
+
+        async function claimBingo() {
+            if (!isJoined) return alert("በጨዋታው አልተሳተፉም!");
+
+            const markedCells = document.querySelectorAll('.cell.marked');
+            const markedIndices = Array.from(markedCells).map(c => parseInt(c.dataset.index));
+
+            const res = await fetch('/api/claim_bingo', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: 'user_1', amount: amt, tx_id: tx })
-            })
-            .then(res => res.json())
-            .then(data => alert(data.message));
+                body: JSON.stringify({ 
+                    player_name: currentUser.name,
+                    telegram_id: tgId,
+                    board: currentBoardState,
+                    marked_indices: markedIndices
+                })
+            });
+            const data = await res.json();
+
+            if (data.status === 'invalid') {
+                alert(data.message);
+            }
         }
 
-        function withdrawTelebirr() {
-            const amt = document.getElementById('tb-amount').value;
-            const tx = document.getElementById('tb-txid').value;
-            if(!amt || !tx) return alert('እባክዎን መጠኑን እና የቴሌብር ስልክ ቁጥርዎን ያስገቡ!');
+        function showWinnerModal(winner, winningNum, prize) {
+            const modal = document.getElementById('winModal');
+            if (winner === currentUser.name) {
+                document.getElementById('winTitle').innerText = "🎉 እንኳን ደስ አለህ!";
+                document.getElementById('winMessage').innerText = `በመጨረሻው ጥሪ (${winningNum}) አሸንፈሃል! 🏆\n ያሸነፉት ገንዘብ፦ ${prize} ETB`;
+            } else {
+                document.getElementById('winTitle').innerText = "🏁 ጨዋታው ተጠናቋል!";
+                document.getElementById('winMessage').innerText = `ተጫዋች ${winner} በመጨረሻው ጥሪ (${winningNum}) አሸንፏል!`;
+            }
+            modal.style.display = 'flex';
+        }
 
-            fetch('/api/withdraw', {
+        function closeModalAndPrepare() {
+            document.getElementById('winModal').style.display = 'none';
+        }
+
+        function resetForNewGame() {
+            generateStandardBingoBoard();
+            document.getElementById('newGameBtn').classList.add('hidden');
+            document.getElementById('currentNum').innerText = '--';
+            document.getElementById('ballsHistory').innerHTML = '';
+            alert("አዲስ የቢንጎ ቦርድ ተዘጋጅቷል! አድሚኑ አዲስ ጨዋታ እስኪጀምር ይበቁ።");
+        }
+
+        function toggleDeposit() {
+            const form = document.getElementById('depositForm');
+            const arrow = document.getElementById('depositArrow');
+            const open = form.style.display === 'none';
+            form.style.display = open ? 'block' : 'none';
+            arrow.textContent = open ? '▲' : '▼';
+        }
+
+        async function submitDepositRequest() {
+            const amount = document.getElementById('depAmount').value;
+            const note   = document.getElementById('depNote').value;
+            const msg    = document.getElementById('depMsg');
+            if (!amount || amount <= 0) { msg.style.color='#e74c3c'; msg.textContent='ትክክለኛ ብር ያስገቡ!'; return; }
+
+            const res = await fetch('/api/request_deposit', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: 'user_1', amount: amt, telebirr: tx })
-            })
-            .then(res => res.json())
-            .then(data => alert(data.message));
+                body: JSON.stringify({ telegram_id: tgId, amount: parseFloat(amount), note: note })
+            });
+            const data = await res.json();
+            msg.style.color = data.status === 'success' ? '#2ecc71' : '#e74c3c';
+            msg.textContent = data.message;
+            if (data.status === 'success') {
+                document.getElementById('depAmount').value = '';
+                document.getElementById('depNote').value = '';
+            }
         }
+
+        checkUser();
     </script>
 </body>
 </html>
