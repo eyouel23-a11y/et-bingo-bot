@@ -3,103 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ET Bingo - Admin Dashboard</title>
+    <title>ET BINGO Admin Panel</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 15px; margin: 0; }
-        .stats-box { background: #1e1e1e; padding: 15px; border-radius: 10px; border: 1px solid #2ecc71; margin-bottom: 20px; text-align: center; }
-        .stats-amount { font-size: 32px; font-weight: bold; color: #2ecc71; margin-top: 5px; }
-        table { width: 100%; border-collapse: collapse; background: #1e1e1e; border-radius: 8px; overflow: hidden; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
-        th { background: #00838f; color: white; }
-        input[type="number"] { width: 90px; padding: 6px; border-radius: 4px; border: 1px solid #444; background: #222; color: #fff; text-align: center; }
-        .dep-btn { background: #27ae60; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .refresh-btn { background: #0288d1; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; font-size: 14px; }
+        body { font-family: sans-serif; background: #121212; color: white; padding: 15px; }
+        .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        .stats-box { background: #2c2c2e; border-left: 4px solid #2ecc71; padding: 10px 15px; margin: 10px 0; border-radius: 6px; }
+        .btn { padding: 12px 18px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin: 4px; }
+        .btn-start { background: #2ecc71; color: white; }
+        .btn-pause { background: #f1c40f; color: black; }
+        .btn-reset { background: #e74c3c; color: white; }
+        .btn-nav { background: #3498db; color: white; width: 100%; display: block; text-align: center; text-decoration: none; box-sizing: border-box; margin-top: 10px; font-size: 16px; }
+        select { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #121212; color: white; margin: 5px 0; width: 100%; }
     </style>
 </head>
 <body>
 
-    <h2>🎛️ የጨዋታው አድሚን መቆጣጠሪያ (Admin Control)</h2>
+    <h2>Admin Control Panel 🛠️</h2>
 
-    <div class="stats-box">
-        <div>💰 የእርሶ 25% የተሰበሰበ ኮሚሽን (Total Admin Cut):</div>
-        <div class="stats-amount"><span id="adminEarnings">0.00</span> ብር</div>
+    <div class="card">
+        <h3>Game ID: #<span id="gameId">--</span> | Status: <span id="gameStatus" style="color:#f1c40f;">WAITING</span></h3>
+
+        <div class="stats-box">
+            <div>👥 <b>ተሳታፊዎች፦</b> <span id="joinedCount" style="color:#f1c40f; font-weight:bold;">0</span> ሰው</div>
+            <div>💰 <b>የተሰበሰበ ጠቅላላ ገንዘብ፦</b> <span id="totalPool" style="color:#3498db; font-weight:bold;">0</span> ETB</div>
+            <div>🏆 <b>የአሸናፊው ሽልማት (75%)፦</b> <span id="prizeAmount" style="color:#2ecc71; font-weight:bold; font-size:18px;">0</span> ETB</div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+            <label>💰 የመደብ ገንዘብ (Fee)፦</label>
+            <select id="feeSelect">
+                <option value="20">20 ETB</option>
+                <option value="30">30 ETB</option>
+                <option value="40">40 ETB</option>
+                <option value="50">50 ETB</option>
+                <option value="60">60 ETB</option>
+                <option value="70">70 ETB</option>
+                <option value="80">80 ETB</option>
+                <option value="90">90 ETB</option>
+                <option value="100">100 ETB</option>
+            </select>
+
+            <label>🎯 የማሸነፊያ ህግ (Pattern)፦</label>
+            <select id="patternSelect">
+                <option value="any_line">Any 1 Line (ማንኛውም 1 መስመር)</option>
+                <option value="two_lines">2 Lines (ማንኛውም 2 መስመር)</option>
+                <option value="full_house">Full House (ሙሉ ቦርድ)</option>
+            </select>
+        </div>
+
+        <button class="btn btn-start" onclick="control('start')">🚀 Start Game</button>
+        <button class="btn btn-pause" onclick="control('pause')">⏸️ Pause</button>
+        <button class="btn btn-reset" onclick="control('reset')">🔄 New Game (Reset)</button>
+
+        <p>የተጠራ ጥሪ፦ <b id="currentNum" style="color:#2ecc71; font-size:26px;">--</b></p>
+        <p id="winnerAlert" style="color:#f1c40f; font-weight:bold; font-size:16px;"></p>
     </div>
 
-    <h3>👥 የተመዘገቡ ተጫዋቾች ዝርዝር</h3>
-    <button class="refresh-btn" onclick="loadUsers()">🔄 Refresh List</button>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Telegram ID</th>
-                <th>Username</th>
-                <th>ስልክ ቁጥር</th>
-                <th>ያላቸው ባላንስ</th>
-                <th>ብር/ቶከን መሙያ (Deposit)</th>
-            </tr>
-        </thead>
-        <tbody id="userTable">
-            <!-- Data dynamically loads here -->
-        </tbody>
-    </table>
+    <div class="card">
+        <h3>ፈጣን ማውጫ (Quick Navigation)</h3>
+        <a href="/admin/users" class="btn btn-nav">👥 የተጫዋቾች ዝርዝር እና ባላንስ መሙያ</a>
+        <a href="/admin/history" class="btn btn-nav" style="background:#9b59b6;">📜 የጨዋታዎች ታሪክ (History)</a>
+    </div>
 
     <script>
-        async function loadUsers() {
-            let res = await fetch('/api/admin/users');
-            let data = await res.json();
+        async function fetchAdminData() {
+            try {
+                const res = await fetch('/api/admin/data');
+                const data = await res.json();
 
-            document.getElementById('adminEarnings').innerText = data.admin_earnings.toFixed(2);
+                document.getElementById('gameId').innerText = data.game_state.game_id;
+                document.getElementById('gameStatus').innerText = data.game_state.status.toUpperCase();
 
-            let tbody = document.getElementById('userTable');
-            tbody.innerHTML = '';
+                // Update stats
+                document.getElementById('joinedCount').innerText = data.joined_count;
+                document.getElementById('totalPool').innerText = data.total_pool;
+                document.getElementById('prizeAmount').innerText = data.prize_amount;
 
-            if(data.users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#aaa;">ገና የተመዘገበ ተጫዋች የለም</td></tr>';
-                return;
-            }
+                const called = data.game_state.called_numbers;
+                document.getElementById('currentNum').innerText = called.length > 0 ? called[called.length - 1] : '--';
 
-            data.users.forEach(u => {
-                let tg_id = u[0];
-                let username = u[1] ? '@' + u[1] : 'የለውም';
-                let phone = u[2];
-                let balance = u[3];
-
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${tg_id}</td>
-                        <td>${username}</td>
-                        <td>${phone}</td>
-                        <td style="color:#2ecc71; font-weight:bold;">${balance.toFixed(2)} ብር</td>
-                        <td>
-                            <input type="number" id="amt_${tg_id}" placeholder="መጠን">
-                            <button class="dep-btn" onclick="deposit('${tg_id}')">Deposit</button>
-                        </td>
-                    </tr>
-                `;
-            });
+                if(data.game_state.winner) {
+                    document.getElementById('winnerAlert').innerText = `🏆 አሸናፊ፦ ${data.game_state.winner} (በጥሪ ${data.game_state.winning_number})`;
+                } else {
+                    document.getElementById('winnerAlert').innerText = '';
+                }
+            } catch(e) {}
         }
 
-        async function deposit(tg_id) {
-            let amtInput = document.getElementById(`amt_${tg_id}`);
-            let amount = amtInput.value;
+        async function control(action) {
+            const fee = document.getElementById('feeSelect').value;
+            const pattern = document.getElementById('patternSelect').value;
 
-            if(!amount || amount <= 0) return alert('እባክዎን ትክክለኛ የገንዘብ መጠን ያስገቡ!');
-
-            let res = await fetch('/api/admin/deposit', {
+            await fetch('/api/admin_control', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ telegram_id: tg_id, amount: amount })
+                body: JSON.stringify({ action: action, entry_fee: fee, pattern: pattern })
             });
-
-            let data = await res.json();
-            if(data.status === 'success') {
-                alert(`✅ ${amount} ብር በጥሩ ሁኔታ ተሞልቷል!`);
-                amtInput.value = '';
-                loadUsers();
-            }
+            fetchAdminData();
         }
 
-        loadUsers();
+        setInterval(fetchAdminData, 2000);
+        fetchAdminData();
     </script>
 </body>
 </html>
