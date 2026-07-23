@@ -5,9 +5,8 @@ from flask import Flask, render_template_string, jsonify, request
 app = Flask(__name__)
 
 # --- IN-MEMORY DATABASE ---
-# እዚህ ጋር ተጫዋቾች፣ ክፍሎች እና የአድሚን ጥያቄዎች ይቀመጣሉ
-users = {}  # ፎርማት: {"0911223344": {"phone": "0911223344", "balance": 0.0}}
-admin_telebirr = "0982289449"  # የአንተ የቴሌብር ቁጥር
+users = {}  # {"0911223344": {"phone": "0911223344", "balance": 0.0}}
+admin_telebirr = "0982289449"
 
 rooms = {
     "room_20_5": {"id": "room_20_5", "name": "ባለ 20 ብር (5 ሰው)", "entry_fee": 20, "max_players": 5, "players": [], "status": "waiting"},
@@ -16,9 +15,9 @@ rooms = {
     "room_30_10": {"id": "room_30_10", "name": "ባለ 30 ብር (10 ሰው)", "entry_fee": 30, "max_players": 10, "players": [], "status": "waiting"}
 }
 
-deposit_requests = []  # [{"id": 1, "phone": "...", "amount": 100, "screenshot": "...", "status": "pending"}]
+deposit_requests = []
 
-# --- HTML & FRONTEND (INLINED) ---
+# --- HTML & FRONTEND (USER APP) ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="am">
@@ -49,7 +48,7 @@ HTML_TEMPLATE = """
         .btn-success { background-color: var(--btn-green); }
         .btn-danger { background-color: var(--btn-red); }
         .btn-bingo { background-color: var(--accent-color); font-size: 20px; padding: 15px; margin-top: 15px; }
-        input, select { width: 90%; padding: 10px; margin: 6px 0; border-radius: 6px; border: 1px solid #444; background: #121212; color: white; }
+        input { width: 90%; padding: 10px; margin: 6px 0; border-radius: 6px; border: 1px solid #444; background: #121212; color: white; }
         .bingo-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-width: 350px; margin: 15px auto; background: #2a2a2a; padding: 8px; border-radius: 10px; }
         .bingo-cell { background: #1e1e1e; border: 1px solid #444; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border-radius: 6px; cursor: pointer; }
         .bingo-cell.marked { background-color: var(--btn-green); color: white; }
@@ -58,7 +57,6 @@ HTML_TEMPLATE = """
 </head>
 <body>
 
-    <!-- Registration Screen -->
     <div id="reg-screen" class="card">
         <h2>👋 እንኳን ወደ ET Bingo መጡ</h2>
         <p>ለመጀመር ስልክ ቁጥርዎን ያስገቡ</p>
@@ -66,14 +64,12 @@ HTML_TEMPLATE = """
         <button class="btn btn-success" onclick="registerUser()">ይመዝገቡ (Register)</button>
     </div>
 
-    <!-- Main App Screen -->
     <div id="main-screen" style="display:none;">
         <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
             <div><b>🎲 ET BINGO</b></div>
             <div class="balance-box">💰 <span id="balance">0.00</span> ETB</div>
         </div>
 
-        <!-- Active Game Section -->
         <div id="game-section" class="card" style="display:none;">
             <div style="background:#222; padding:10px; border-radius:8px; font-size:18px; margin-bottom:10px;">
                 የወጣው ቁጥር፦ <span id="current-drawn-num" style="color:var(--accent-color); font-weight:bold;">-</span>
@@ -82,7 +78,6 @@ HTML_TEMPLATE = """
             <button class="btn btn-bingo" onclick="claimBingo()">🎉 BINGO!</button>
         </div>
 
-        <!-- Rooms Section -->
         <div id="rooms-section" class="card">
             <div class="section-title">የጨዋታ ክፍሎች (Auto Rooms)</div>
             <div class="rooms-grid">
@@ -109,7 +104,6 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
-        <!-- Telebirr Deposit Section -->
         <div class="card">
             <div class="section-title" style="margin-top:0;">📲 ቴሌብር ሂሳብ ማስገባት (Deposit)</div>
             <p style="font-size: 13px; color: #aaa; text-align: left;">በዚህ የቴሌብር ቁጥር ብር ያስተላልፉ፦ <b style="color:var(--accent-color);">0982289449</b></p>
@@ -256,7 +250,7 @@ HTML_TEMPLATE = """
 </html>
 """
 
-# --- ADMIN PANEL TEMPLATE ---
+# --- ADMIN PANEL TEMPLATE (ENHANCED) ---
 ADMIN_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="am">
@@ -265,34 +259,69 @@ ADMIN_TEMPLATE = """
     <title>Admin Dashboard</title>
     <style>
         body { font-family: sans-serif; background: #111; color: #fff; padding: 20px; }
+        .section { background: #1a1a1a; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
         .req-card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #ff9800; }
+        .user-row { background: #222; padding: 10px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
         .btn { background: #4CAF50; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         img { max-width: 200px; border-radius: 5px; margin-top: 10px; display: block; }
     </style>
 </head>
 <body>
-    <h2>🛠️ Admin Dashboard - Deposit Approvals</h2>
-    <div id="requests-container">ምንም አዲስ የዲፖዚት ጥያቄ የለም።</div>
+    <h2>🛠️ Admin Dashboard</h2>
+
+    <div class="section">
+        <h3>📥 የዲፖዚት ጥያቄዎች (Deposit Requests)</h3>
+        <div id="requests-container">ምንም አዲስ የዲፖዚት ጥያቄ የለም።</div>
+    </div>
+
+    <div class="section">
+        <h3>👥 የተመዝጋቢዎች ዝርዝር (All Registered Users)</h3>
+        <div id="users-container">ምንም ተመዝጋቢ የለም።</div>
+    </div>
 
     <script>
-        function loadRequests() {
+        function loadAdminData() {
+            // Load Deposit Requests
             fetch('/api/admin/requests')
             .then(res => res.json())
             .then(data => {
                 const container = document.getElementById('requests-container');
-                if(data.requests.length === 0) return;
-                container.innerHTML = '';
-                data.requests.forEach(req => {
-                    container.innerHTML += `
-                        <div class="req-card">
-                            <p><b>ስልክ ቁጥር፦</b> ${req.phone}</p>
-                            <p><b>የጠየቀው ብር፦</b> ${req.amount} ETB</p>
-                            ${req.screenshot ? `<a href="${req.screenshot}" target="_blank"><img src="${req.screenshot}"></a>` : '<p>ስክሪንሻት የለም</p>'}
-                            <br>
-                            <button class="btn" onclick="approveDeposit(${req.id})">Approve (አረጋግጥ)</button>
-                        </div>
-                    `;
-                });
+                if(data.requests.length === 0) {
+                    container.innerHTML = 'ምንም አዲስ የዲፖዚት ጥያቄ የለም።';
+                } else {
+                    container.innerHTML = '';
+                    data.requests.forEach(req => {
+                        container.innerHTML += `
+                            <div class="req-card">
+                                <p><b>ስልክ ቁጥር፦</b> ${req.phone}</p>
+                                <p><b>የጠየቀው ብር፦</b> ${req.amount} ETB</p>
+                                ${req.screenshot ? `<a href="${req.screenshot}" target="_blank"><img src="${req.screenshot}"></a>` : '<p>ስክሪንሻት የለም</p>'}
+                                <br>
+                                <button class="btn" onclick="approveDeposit(${req.id})">Approve (አረጋግጥ)</button>
+                            </div>
+                        `;
+                    });
+                }
+            });
+
+            // Load All Registered Users
+            fetch('/api/admin/users')
+            .then(res => res.json())
+            .then(data => {
+                const container = document.getElementById('users-container');
+                if(data.users.length === 0) {
+                    container.innerHTML = 'ምንም ተመዝጋቢ የለም።';
+                } else {
+                    container.innerHTML = '';
+                    data.users.forEach(u => {
+                        container.innerHTML += `
+                            <div class="user-row">
+                                <span>📱 <b>${u.phone}</b></span>
+                                <span style="color:#ff9800;">💰 <b>${u.balance} ETB</b></span>
+                            </div>
+                        `;
+                    });
+                }
             });
         }
 
@@ -305,11 +334,12 @@ ADMIN_TEMPLATE = """
             .then(res => res.json())
             .then(data => {
                 alert(data.message);
-                loadRequests();
+                loadAdminData();
             });
         }
 
-        loadRequests();
+        loadAdminData();
+        setInterval(loadAdminData, 5000); // Refresh every 5 seconds
     </script>
 </body>
 </html>
@@ -366,6 +396,11 @@ def admin_requests():
     pending = [r for r in deposit_requests if r["status"] == "pending"]
     return jsonify({"requests": pending})
 
+@app.route('/api/admin/users', methods=['GET'])
+def admin_users():
+    all_users = list(users.values())
+    return jsonify({"users": all_users})
+
 @app.route('/api/admin/approve', methods=['POST'])
 def admin_approve():
     data = request.json
@@ -394,7 +429,6 @@ def join_room():
     if not user or not room:
         return jsonify({"success": False, "message": "መረጃው አልተገኘም!"}), 404
 
-    # የባላንስ ማረጋገጫ (Balance Validation)
     if user['balance'] < room['entry_fee']:
         return jsonify({"success": False, "message": f"በቂ ባላንስ የለዎትም! (የሚጠበቀው: {room['entry_fee']} ብር፣ ያሎት: {user['balance']} ብር)"}), 400
 
@@ -403,7 +437,6 @@ def join_room():
 
     room['players'].append(phone)
 
-    # ቁጥሩ ሲሞላ አውቶማቲክ ብር መቁረጥ እና መጀመር
     if len(room['players']) == room['max_players']:
         room['status'] = "playing"
         for p in room['players']:
