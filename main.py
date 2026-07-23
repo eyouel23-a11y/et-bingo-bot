@@ -133,11 +133,9 @@ HTML_TEMPLATE = """
         let currentUserPhone = localStorage.getItem('bingo_user_phone');
         let currentRoomId = null;
 
-        // Check if user is already registered in localStorage and backend
         if (currentUserPhone) {
             checkUserSession(currentUserPhone);
         } else {
-            // Show registration screen if no phone found locally
             document.getElementById('reg-screen').style.display = 'block';
         }
 
@@ -161,7 +159,7 @@ HTML_TEMPLATE = """
                 } else {
                     alert(data.message);
                 }
-            });
+            }).catch(err => alert('የኔትወርክ ስህተት ተፈጥሯል: ' + err));
         }
 
         function checkUserSession(phone) {
@@ -169,12 +167,10 @@ HTML_TEMPLATE = """
             .then(res => res.json())
             .then(data => {
                 if(data.success) {
-                    // User exists, skip registration and go straight to rooms/main screen
                     document.getElementById('reg-screen').style.display = 'none';
                     document.getElementById('main-screen').style.display = 'block';
                     document.getElementById('balance').innerText = data.balance;
                 } else {
-                    // If user was cleared from server memory (e.g., restart), force re-register
                     localStorage.removeItem('bingo_user_phone');
                     document.getElementById('reg-screen').style.display = 'block';
                 }
@@ -366,7 +362,7 @@ ADMIN_TEMPLATE = """
         }
 
         loadAdminData();
-        setInterval(loadAdminData, 5000);
+        setInterval(loadAdminData, 3000);
     </script>
 </body>
 </html>
@@ -377,7 +373,7 @@ ADMIN_TEMPLATE = """
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,X-Requested-With'
     response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
     return response
 
@@ -392,8 +388,8 @@ def admin_page():
 @app.route('/api/register', methods=['POST', 'OPTIONS'])
 def register():
     if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'})
-    data = request.json
+        return jsonify({'status': 'ok'}), 200
+    data = request.json or {}
     phone = data.get('phone')
     if not phone:
         return jsonify({"success": False, "message": "ስልክ ቁጥር አልተገኘም!"})
@@ -403,8 +399,10 @@ def register():
 
     return jsonify({"success": True, "balance": users[phone]["balance"]})
 
-@app.route('/api/get_user', methods=['GET'])
+@app.route('/api/get_user', methods=['GET', 'OPTIONS'])
 def get_user():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
     phone = request.args.get('phone')
     if phone in users:
         return jsonify({"success": True, "balance": users[phone]["balance"]})
@@ -413,8 +411,8 @@ def get_user():
 @app.route('/api/deposit', methods=['POST', 'OPTIONS'])
 def deposit():
     if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'})
-    data = request.json
+        return jsonify({'status': 'ok'}), 200
+    data = request.json or {}
     phone = data.get('phone')
     amount = float(data.get('amount', 0))
     screenshot = data.get('screenshot', '')
@@ -429,21 +427,25 @@ def deposit():
     })
     return jsonify({"success": True, "message": "የክፍያ ማረጋገጫዎ ለአድሚን ተልኳል! ሲታረም ባላንስዎ ይጨመራል።"})
 
-@app.route('/api/admin/requests', methods=['GET'])
+@app.route('/api/admin/requests', methods=['GET', 'OPTIONS'])
 def admin_requests():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
     pending = [r for r in deposit_requests if r["status"] == "pending"]
     return jsonify({"requests": pending})
 
-@app.route('/api/admin/users', methods=['GET'])
+@app.route('/api/admin/users', methods=['GET', 'OPTIONS'])
 def admin_users():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
     all_users = list(users.values())
     return jsonify({"users": all_users})
 
 @app.route('/api/admin/approve', methods=['POST', 'OPTIONS'])
 def admin_approve():
     if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'})
-    data = request.json
+        return jsonify({'status': 'ok'}), 200
+    data = request.json or {}
     req_id = data.get('req_id')
 
     for req in deposit_requests:
@@ -460,8 +462,8 @@ def admin_approve():
 @app.route('/api/join_room', methods=['POST', 'OPTIONS'])
 def join_room():
     if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'})
-    data = request.json
+        return jsonify({'status': 'ok'}), 200
+    data = request.json or {}
     phone = data.get('phone')
     room_id = data.get('room_id')
 
@@ -489,8 +491,8 @@ def join_room():
 @app.route('/api/claim_bingo', methods=['POST', 'OPTIONS'])
 def claim_bingo():
     if request.method == 'OPTIONS':
-        return jsonify({'status': 'ok'})
-    data = request.json
+        return jsonify({'status': 'ok'}), 200
+    data = request.json or {}
     phone = data.get('phone')
     room_id = data.get('room_id')
     room = rooms.get(room_id)
