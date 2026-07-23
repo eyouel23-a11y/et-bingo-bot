@@ -58,7 +58,6 @@ HTML_TEMPLATE = """
 </head>
 <body>
 
-    <!-- Registration Screen -->
     <div id="reg-screen" class="card" style="display:none;">
         <h2>👋 እንኳን ወደ ET Bingo መጡ</h2>
         <p>ለመጀመር ስልክ ቁጥርዎን ያስገቡ</p>
@@ -66,14 +65,12 @@ HTML_TEMPLATE = """
         <button class="btn btn-success" onclick="registerUser()">ይመዝገቡ (Register)</button>
     </div>
 
-    <!-- Main App Screen -->
     <div id="main-screen" style="display:none;">
         <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
             <div><b>🎲 ET BINGO</b></div>
             <div class="balance-box">💰 <span id="balance">0.00</span> ETB</div>
         </div>
 
-        <!-- Active Game Section -->
         <div id="game-section" class="card" style="display:none;">
             <div style="background:#222; padding:10px; border-radius:8px; font-size:18px; margin-bottom:10px;">
                 የወጣው ቁጥር፦ <span id="current-drawn-num" style="color:var(--accent-color); font-weight:bold;">-</span>
@@ -82,7 +79,6 @@ HTML_TEMPLATE = """
             <button class="btn btn-bingo" onclick="claimBingo()">🎉 BINGO!</button>
         </div>
 
-        <!-- Rooms Section -->
         <div id="rooms-section" class="card">
             <div class="section-title">የጨዋታ ክፍሎች (Auto Rooms)</div>
             <div class="rooms-grid" style="grid-template-columns: 1fr;">
@@ -116,7 +112,6 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
-        <!-- Telebirr Deposit Section -->
         <div class="card">
             <div class="section-title" style="margin-top:0;">📲 ቴሌብር ሂሳብ ማስገባት (Deposit)</div>
             <p style="font-size: 13px; color: #aaa; text-align: left;">በዚህ የቴሌብር ቁጥር ብር ያስተላልፉ፦ <b style="color:var(--accent-color);">0982289449</b></p>
@@ -133,6 +128,7 @@ HTML_TEMPLATE = """
         let currentUserPhone = localStorage.getItem('bingo_user_phone');
         let currentRoomId = null;
 
+        // Session validation check on load
         if (currentUserPhone) {
             checkUserSession(currentUserPhone);
         } else {
@@ -140,7 +136,7 @@ HTML_TEMPLATE = """
         }
 
         function registerUser() {
-            const phone = document.getElementById('reg-phone').value;
+            const phone = document.getElementById('reg-phone').value.trim();
             if(!phone) return alert('እባክዎን ስልክ ቁጥር ያስገቡ!');
 
             fetch('/api/register', {
