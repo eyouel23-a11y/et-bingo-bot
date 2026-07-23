@@ -11,7 +11,7 @@ deposit_requests = []
 admin_telebirr = "0982289449"
 
 rooms = {
-    "room_test_1": {"id": "room_test_1", "name": "🧪 የፈተና ክፍል (ለፍተሻ 20 ብር - 1 ሰው)", "entry_fee": 20, "max_players": 1, "players": [], "status": "waiting"},
+    "room_test_1": {"id": "room_test_1", "name": "🧪 የፈተና ክፍል (1 ሰው)", "entry_fee": 20, "max_players": 1, "players": [], "status": "waiting"},
     "room_20_5": {"id": "room_20_5", "name": "ባለ 20 ብር (5 ሰው)", "entry_fee": 20, "max_players": 5, "players": [], "status": "waiting"},
     "room_30_5": {"id": "room_30_5", "name": "ባለ 30 ብር (5 ሰው)", "entry_fee": 30, "max_players": 5, "players": [], "status": "waiting"},
     "room_40_5": {"id": "room_40_5", "name": "ባለ 40 ብር (5 ሰው)", "entry_fee": 40, "max_players": 5, "players": [], "status": "waiting"},
@@ -360,7 +360,7 @@ ADMIN_TEMPLATE = """
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template_string(HTML_TEMPLATE)
 
 @app.route('/admin')
 def admin_page():
@@ -475,4 +475,4 @@ def claim_bingo():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+    app.run(host='0.0.0.0', port=port, debug=False)
