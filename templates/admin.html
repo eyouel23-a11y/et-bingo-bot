@@ -2,52 +2,108 @@
 <html lang="am">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ET BINGO Admin Panel</title>
     <style>
-        body { font-family: sans-serif; background: #111; color: #fff; padding: 20px; }
-        .card { background: #1a1a1a; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
-        .btn { background: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .nav { margin-bottom: 15px; }
-        .nav a { color: #ff9800; margin-right: 15px; text-decoration: none; font-weight: bold; }
+        body { font-family: sans-serif; background: #121212; color: white; padding: 15px; }
+        .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        .stats-box { background: #2c2c2e; border-left: 4px solid #2ecc71; padding: 10px 15px; margin: 10px 0; border-radius: 6px; }
+        .btn { padding: 12px 18px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin: 4px; }
+        .btn-start { background: #2ecc71; color: white; }
+        .btn-pause { background: #f1c40f; color: black; }
+        .btn-reset { background: #e74c3c; color: white; }
+        .btn-nav { background: #3498db; color: white; width: 100%; display: block; text-align: center; text-decoration: none; box-sizing: border-box; margin-top: 10px; font-size: 16px; }
+        select { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #121212; color: white; margin: 5px 0; width: 100%; }
     </style>
 </head>
 <body>
-    <h2>🛠️ Admin Dashboard</h2>
-    <div class="nav">
-        <a href="/admin">ዲፖዚቶች</a>
-        <a href="/admin/users">ተጠቃሚዎች</a>
-        <a href="/admin/history">ታሪክ</a>
-    </div>
+
+    <h2>Admin Control Panel 🛠️</h2>
+
     <div class="card">
-        <h3>📥 የዲፖዚት ጥያቄዎች</h3>
-        <div id="reqs">መረጃ በመጫን ላይ...</div>
+        <h3>Game ID: #<span id="gameId">--</span> | Status: <span id="gameStatus" style="color:#f1c40f;">WAITING</span></h3>
+
+        <div class="stats-box">
+            <div>👥 <b>ተሳታፊዎች፦</b> <span id="joinedCount" style="color:#f1c40f; font-weight:bold;">0</span> ሰው</div>
+            <div>💰 <b>የተሰበሰበ ጠቅላላ ገንዘብ፦</b> <span id="totalPool" style="color:#3498db; font-weight:bold;">0</span> ETB</div>
+            <div>🏆 <b>የአሸናፊው ሽልማት (75%)፦</b> <span id="prizeAmount" style="color:#2ecc71; font-weight:bold; font-size:18px;">0</span> ETB</div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+            <label>💰 የመደብ ገንዘብ (Fee)፦</label>
+            <select id="feeSelect">
+                <option value="20">20 ETB</option>
+                <option value="30">30 ETB</option>
+                <option value="40">40 ETB</option>
+                <option value="50">50 ETB</option>
+                <option value="60">60 ETB</option>
+                <option value="70">70 ETB</option>
+                <option value="80">80 ETB</option>
+                <option value="90">90 ETB</option>
+                <option value="100">100 ETB</option>
+            </select>
+
+            <label>🎯 የማሸነፊያ ህግ (Pattern)፦</label>
+            <select id="patternSelect">
+                <option value="any_line">Any 1 Line (ማንኛውም 1 መስመር)</option>
+                <option value="two_lines">2 Lines (ማንኛውም 2 መስመር)</option>
+                <option value="full_house">Full House (ሙሉ ቦርድ)</option>
+            </select>
+        </div>
+
+        <button class="btn btn-start" onclick="control('start')">🚀 Start Game</button>
+        <button class="btn btn-pause" onclick="control('pause')">⏸️ Pause</button>
+        <button class="btn btn-reset" onclick="control('reset')">🔄 New Game (Reset)</button>
+
+        <p>የተጠራ ጥሪ፦ <b id="currentNum" style="color:#2ecc71; font-size:26px;">--</b></p>
+        <p id="winnerAlert" style="color:#f1c40f; font-weight:bold; font-size:16px;"></p>
+    </div>
+
+    <div class="card">
+        <h3>ፈጣን ማውጫ (Quick Navigation)</h3>
+        <a href="/admin/users" class="btn btn-nav">👥 የተጫዋቾች ዝርዝር እና ባላንስ መሙያ</a>
+        <a href="/admin/history" class="btn btn-nav" style="background:#9b59b6;">📜 የጨዋታዎች ታሪክ (History)</a>
     </div>
 
     <script>
-        function loadData() {
-            fetch('/api/admin/data')
-            .then(res => res.json()).then(data => {
-                const reqDiv = document.getElementById('reqs');
-                if(!data.requests || data.requests.length === 0) {
-                    reqDiv.innerHTML = 'ምንም ጥያቄ የለም።';
+        async function fetchAdminData() {
+            try {
+                const res = await fetch('/api/admin/data');
+                const data = await res.json();
+
+                document.getElementById('gameId').innerText = data.game_state.game_id;
+                document.getElementById('gameStatus').innerText = data.game_state.status.toUpperCase();
+
+                // Update stats
+                document.getElementById('joinedCount').innerText = data.joined_count;
+                document.getElementById('totalPool').innerText = data.total_pool;
+                document.getElementById('prizeAmount').innerText = data.prize_amount;
+
+                const called = data.game_state.called_numbers;
+                document.getElementById('currentNum').innerText = called.length > 0 ? called[called.length - 1] : '--';
+
+                if(data.game_state.winner) {
+                    document.getElementById('winnerAlert').innerText = `🏆 አሸናፊ፦ ${data.game_state.winner} (በጥሪ ${data.game_state.winning_number})`;
                 } else {
-                    reqDiv.innerHTML = '';
-                    data.requests.forEach(r => {
-                        reqDiv.innerHTML += `<p>${r.phone} - ${r.amount} ETB <button class="btn" onclick="approve(${r.id})">አረጋግጥ</button></p>`;
-                    });
+                    document.getElementById('winnerAlert').innerText = '';
                 }
-            });
+            } catch(e) {}
         }
 
-        function approve(id) {
-            fetch('/api/admin/approve', {
+        async function control(action) {
+            const fee = document.getElementById('feeSelect').value;
+            const pattern = document.getElementById('patternSelect').value;
+
+            await fetch('/api/admin_control', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({req_id: id})
-            }).then(res => res.json()).then(data => { alert(data.message); loadData(); });
+                body: JSON.stringify({ action: action, entry_fee: fee, pattern: pattern })
+            });
+            fetchAdminData();
         }
 
-        loadData();
+        setInterval(fetchAdminData, 2000);
+        fetchAdminData();
     </script>
 </body>
 </html>

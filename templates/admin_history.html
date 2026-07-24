@@ -2,36 +2,62 @@
 <html lang="am">
 <head>
     <meta charset="UTF-8">
-    <title>Admin - History</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>የጨዋታዎች ታሪክ - ET BINGO Admin</title>
     <style>
-        body { font-family: sans-serif; background: #111; color: #fff; padding: 20px; }
-        .card { background: #1a1a1a; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
-        .nav { margin-bottom: 15px; }
-        .nav a { color: #ff9800; margin-right: 15px; text-decoration: none; font-weight: bold; }
+        body { font-family: sans-serif; background: #121212; color: white; padding: 15px; }
+        .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        .btn-back { background: #7f8c8d; text-decoration: none; color: white; padding: 8px 15px; border-radius: 6px; display: inline-block; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #333; padding: 10px; text-align: left; font-size: 13px; }
+        th { background: #2c2c2e; }
     </style>
 </head>
 <body>
-    <h2>📊 የጨዋታ ታሪክ (History)</h2>
-    <div class="nav">
-        <a href="/admin">ዲፖዚቶች</a>
-        <a href="/admin/users">ተጠቃሚዎች</a>
-        <a href="/admin/history">ታሪክ</a>
-    </div>
+
+    <a href="/admin" class="btn-back">⬅️ ወደ አድሚን ዋና ገፅ ተመለስ</a>
+
     <div class="card">
-        <div id="history">ምንም የተጠናቀቀ ጨዋታ የለም።</div>
+        <h2>📜 የጨዋታዎች ታሪክ (Game History)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Game ID</th>
+                    <th>አሸናፊ ተጫዋች</th>
+                    <th>የማሸነፊያ ጥሪ</th>
+                    <th>የነበረው ህግ</th>
+                    <th>ሰዓት</th>
+                </tr>
+            </thead>
+            <tbody id="historyTable"></tbody>
+        </table>
     </div>
 
     <script>
-        fetch('/api/admin/data')
-        .then(res => res.json()).then(data => {
-            const histDiv = document.getElementById('history');
-            if(data.history && data.history.length > 0) {
-                histDiv.innerHTML = '';
+        async function fetchHistory() {
+            try {
+                const res = await fetch('/api/admin/data');
+                const data = await res.json();
+
+                const historyTable = document.getElementById('historyTable');
+                historyTable.innerHTML = '';
                 data.history.forEach(h => {
-                    histDiv.innerHTML += `<p>${h}</p>`;
+                    const patternName = h.pattern === 'any_line' ? '1 መስመር' : (h.pattern === 'two_lines' ? '2 መስመር' : 'Full House');
+                    historyTable.innerHTML += `
+                        <tr>
+                            <td>#${h.game_id}</td>
+                            <td style="color:#2ecc71; font-weight:bold;">${h.winner}</td>
+                            <td><b style="color:#f1c40f;">${h.winning_number}</b></td>
+                            <td>${patternName}</td>
+                            <td>${h.time}</td>
+                        </tr>
+                    `;
                 });
-            }
-        });
+            } catch(e) {}
+        }
+
+        setInterval(fetchHistory, 3000);
+        fetchHistory();
     </script>
 </body>
 </html>
