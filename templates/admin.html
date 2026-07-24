@@ -2,228 +2,52 @@
 <html lang="am">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ET BINGO Admin Panel</title>
+    <title>Admin Dashboard</title>
     <style>
-        * { box-sizing: border-box; }
-        body { font-family: sans-serif; background: #121212; color: white; padding: 15px; margin: 0; }
-        h2 { margin: 0 0 14px; }
-        .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
-        .stats-box { background: #2c2c2e; border-left: 4px solid #2ecc71; padding: 10px 15px; margin: 10px 0; border-radius: 6px; }
-        .btn { padding: 10px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin: 3px; font-size: 14px; }
-        .btn-start  { background: #2ecc71; color: white; }
-        .btn-pause  { background: #f1c40f; color: black; }
-        .btn-reset  { background: #e74c3c; color: white; }
-        .btn-approve { background: #2ecc71; color: white; padding: 6px 10px; font-size: 12px; }
-        .btn-reject  { background: #e74c3c; color: white; padding: 6px 10px; font-size: 12px; }
-        .btn-nav { background: #3498db; color: white; width: 100%; display: block; text-align: center;
-                   text-decoration: none; margin-top: 8px; font-size: 15px; padding: 12px; border-radius: 6px; }
-        select { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #1e1e1e; color: white; width: 100%; margin: 5px 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
-        th, td { border: 1px solid #333; padding: 8px; text-align: left; }
-        th { background: #2c2c2e; }
-        input[type="number"] { width: 70px; padding: 5px; border-radius: 4px; border: 1px solid #444; background: #121212; color: white; }
-        .badge-pending  { background: #e67e22; color: white; padding: 2px 7px; border-radius: 10px; font-size: 11px; }
-        .badge-approved { background: #27ae60; color: white; padding: 2px 7px; border-radius: 10px; font-size: 11px; }
-        .badge-rejected { background: #c0392b; color: white; padding: 2px 7px; border-radius: 10px; font-size: 11px; }
-        .section-title { font-size: 15px; font-weight: bold; margin-bottom: 6px; }
-        .no-data { text-align: center; color: #666; padding: 15px; }
+        body { font-family: sans-serif; background: #111; color: #fff; padding: 20px; }
+        .card { background: #1a1a1a; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        .btn { background: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .nav { margin-bottom: 15px; }
+        .nav a { color: #ff9800; margin-right: 15px; text-decoration: none; font-weight: bold; }
     </style>
 </head>
 <body>
-
-<h2>🛠️ Admin Control Panel</h2>
-
-<!-- ── Game Controls ── -->
-<div class="card">
-    <div class="section-title">🎮 Game #<span id="gameId">--</span> — <span id="gameStatus" style="color:#f1c40f;">WAITING</span></div>
-
-    <div class="stats-box">
-        <div>👥 <b>ተሳታፊዎች፦</b> <span id="joinedCount" style="color:#f1c40f; font-weight:bold;">0</span> ሰው</div>
-        <div>💰 <b>የተሰበሰበ ጠቅላላ ገንዘብ፦</b> <span id="totalPool" style="color:#3498db; font-weight:bold;">0</span> ETB</div>
-        <div>🏆 <b>የአሸናፊው ሽልማት (75%)፦</b> <span id="prizeAmount" style="color:#2ecc71; font-weight:bold; font-size:18px;">0</span> ETB</div>
+    <h2>🛠️ Admin Dashboard</h2>
+    <div class="nav">
+        <a href="/admin">ዲፖዚቶች</a>
+        <a href="/admin/users">ተጠቃሚዎች</a>
+        <a href="/admin/history">ታሪክ</a>
+    </div>
+    <div class="card">
+        <h3>📥 የዲፖዚት ጥያቄዎች</h3>
+        <div id="reqs">መረጃ በመጫን ላይ...</div>
     </div>
 
-    <div style="margin-bottom:10px;">
-        <label style="font-size:13px;">💰 የመደብ ገንዘብ (Fee):</label>
-        <select id="feeSelect">
-            <option value="20">20 ETB</option><option value="30">30 ETB</option>
-            <option value="40">40 ETB</option><option value="50">50 ETB</option>
-            <option value="60">60 ETB</option><option value="80">80 ETB</option>
-            <option value="100">100 ETB</option>
-        </select>
-        <label style="font-size:13px;">🎯 የማሸነፊያ ህግ (Pattern):</label>
-        <select id="patternSelect">
-            <option value="any_line">Any 1 Line</option>
-            <option value="two_lines">2 Lines</option>
-            <option value="full_house">Full House</option>
-        </select>
-    </div>
+    <script>
+        function loadData() {
+            fetch('/api/admin/data')
+            .then(res => res.json()).then(data => {
+                const reqDiv = document.getElementById('reqs');
+                if(!data.requests || data.requests.length === 0) {
+                    reqDiv.innerHTML = 'ምንም ጥያቄ የለም።';
+                } else {
+                    reqDiv.innerHTML = '';
+                    data.requests.forEach(r => {
+                        reqDiv.innerHTML += `<p>${r.phone} - ${r.amount} ETB <button class="btn" onclick="approve(${r.id})">አረጋግጥ</button></p>`;
+                    });
+                }
+            });
+        }
 
-    <button class="btn btn-start" onclick="control('start')">🚀 Start Game</button>
-    <button class="btn btn-pause" onclick="control('pause')">⏸️ Pause</button>
-    <button class="btn btn-reset" onclick="control('reset')">🔄 New Game</button>
+        function approve(id) {
+            fetch('/api/admin/approve', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({req_id: id})
+            }).then(res => res.json()).then(data => { alert(data.message); loadData(); });
+        }
 
-    <p style="margin-top:10px;">የተጠራ ጥሪ፦ <b id="currentNum" style="color:#2ecc71; font-size:26px;">--</b></p>
-    <p id="winnerAlert" style="color:#f1c40f; font-weight:bold;"></p>
-</div>
-
-<!-- ── Deposit Requests ── -->
-<div class="card">
-    <div class="section-title">📥 የዲፖዚት ጥያቄዎች <span id="pendingBadge" style="color:#e67e22;"></span></div>
-    <table>
-        <thead>
-            <tr><th>ስም</th><th>ስልክ</th><th>ብር</th><th>ማስታወሻ</th><th>ሁኔታ</th><th>ውሳኔ</th></tr>
-        </thead>
-        <tbody id="depositTable">
-            <tr><td colspan="6" class="no-data">⏳ እየጫኑ ነው...</td></tr>
-        </tbody>
-    </table>
-</div>
-
-<!-- ── Registered Players ── -->
-<div class="card">
-    <div class="section-title">👥 የተመዘገቡ ተጫዋቾች <span id="userCount" style="color:#aaa; font-size:12px;"></span></div>
-    <table>
-        <thead>
-            <tr><th>ስም</th><th>ስልክ</th><th>ባላንስ</th><th>+ ብር ጨምር</th></tr>
-        </thead>
-        <tbody id="userTable">
-            <tr><td colspan="4" class="no-data">⏳ እየጫኑ ነው...</td></tr>
-        </tbody>
-    </table>
-</div>
-
-<!-- ── Navigation ── -->
-<div class="card">
-    <a href="/admin/history" class="btn-nav" style="background:#9b59b6;">📜 የጨዋታዎች ታሪክ (History)</a>
-</div>
-
-<script>
-    let isTyping = false;
-
-    async function fetchGameData() {
-        try {
-            const res = await fetch('/api/admin/data');
-            const data = await res.json();
-            document.getElementById('gameId').innerText = data.game_state.game_id;
-            document.getElementById('gameStatus').innerText = data.game_state.status.toUpperCase();
-            document.getElementById('joinedCount').innerText = data.joined_count;
-            document.getElementById('totalPool').innerText = data.total_pool;
-            document.getElementById('prizeAmount').innerText = data.prize_amount;
-            const called = data.game_state.called_numbers;
-            document.getElementById('currentNum').innerText = called.length > 0 ? called[called.length - 1] : '--';
-            document.getElementById('winnerAlert').innerText = data.game_state.winner
-                ? `🏆 አሸናፊ: ${data.game_state.winner} (በጥሪ ${data.game_state.winning_number})`
-                : '';
-        } catch(e) {}
-    }
-
-    async function fetchDeposits() {
-        try {
-            const res = await fetch('/api/admin/deposit_requests');
-            const data = await res.json();
-            const tbody = document.getElementById('depositTable');
-            const requests = data.requests || [];
-
-            const pending = requests.filter(r => r.status === 'pending').length;
-            document.getElementById('pendingBadge').innerText = pending > 0 ? `(${pending} አዲስ)` : '';
-
-            if (requests.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="no-data">ምንም የዲፖዚት ጥያቄ የለም 📭</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = requests.map(r => `
-                <tr>
-                    <td><b>${r.name}</b></td>
-                    <td>${r.phone}</td>
-                    <td><b style="color:#f1c40f;">${r.amount}</b> ETB</td>
-                    <td style="font-size:11px; color:#aaa;">${r.note || '—'}</td>
-                    <td><span class="badge-${r.status}">${r.status === 'pending' ? 'ይጠብቃል' : r.status === 'approved' ? 'ፀድቋል' : 'ተከልክሏል'}</span></td>
-                    <td>${r.status === 'pending' ? `
-                        <button class="btn btn-approve" onclick="handleDeposit(${r.id},'approve')">✅ አፅድቅ</button>
-                        <button class="btn btn-reject"  onclick="handleDeposit(${r.id},'reject')">❌ ውድቅ</button>
-                    ` : '—'}</td>
-                </tr>
-            `).join('');
-        } catch(e) {}
-    }
-
-    async function handleDeposit(reqId, action) {
-        const confirmed = confirm(action === 'approve' ? 'ዲፖዚቱን ታጸድቃለህ?' : 'ጥያቄውን ትሰርዛለህ?');
-        if (!confirmed) return;
-        await fetch('/api/admin/handle_deposit', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ req_id: reqId, action: action })
-        });
-        fetchDeposits();
-        fetchUsers();
-    }
-
-    async function fetchUsers() {
-        if (isTyping) return;
-        try {
-            const res = await fetch('/api/admin/users');
-            const data = await res.json();
-            const users = data.users || [];
-            document.getElementById('userCount').innerText = `(${users.length} ሰው)`;
-            const tbody = document.getElementById('userTable');
-            if (users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="no-data">ምንም ተጫዋች አልተመዘገበም 📭</td></tr>';
-                return;
-            }
-            tbody.innerHTML = users.map(u => `
-                <tr>
-                    <td><b>${u.name}</b></td>
-                    <td>${u.phone}</td>
-                    <td><b style="color:#2ecc71;">${u.balance}</b> ETB</td>
-                    <td>
-                        <input type="number" id="amt_${u.telegram_id}" placeholder="ብር"
-                               onfocus="isTyping=true" onblur="isTyping=false">
-                        <button class="btn btn-approve" style="padding:6px 10px;"
-                                onclick="addBalance(${u.telegram_id})">+</button>
-                    </td>
-                </tr>
-            `).join('');
-        } catch(e) {}
-    }
-
-    async function addBalance(tgId) {
-        const amtInput = document.getElementById(`amt_${tgId}`);
-        const amt = parseFloat(amtInput.value);
-        if (!amt || amt <= 0) return alert('ትክክለኛ ብር ያስገቡ!');
-        await fetch('/api/admin/update_balance', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ telegram_id: tgId, amount: amt })
-        });
-        amtInput.value = '';
-        isTyping = false;
-        fetchUsers();
-    }
-
-    async function control(action) {
-        const fee     = document.getElementById('feeSelect').value;
-        const pattern = document.getElementById('patternSelect').value;
-        await fetch('/api/admin_control', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action, entry_fee: fee, pattern })
-        });
-        fetchGameData();
-    }
-
-    // Initial load
-    fetchGameData();
-    fetchDeposits();
-    fetchUsers();
-
-    // Auto-refresh
-    setInterval(fetchGameData, 2000);
-    setInterval(fetchDeposits, 4000);
-    setInterval(fetchUsers,    6000);
-</script>
+        loadData();
+    </script>
 </body>
 </html>
