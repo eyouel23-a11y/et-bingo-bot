@@ -3,7 +3,8 @@ import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__)
+# አቃፊው 'template' (s የሌለው) መሆኑን ፍላስክ እንዲረዳው ተደረገ
+app = Flask(__name__, template_folder='template')
 app.secret_key = 'your_secret_key_here'
 
 # Upload folder configuration
@@ -147,7 +148,6 @@ def admin():
                 wit = cursor.fetchone()
                 if wit:
                     username, amount = wit
-                    # ዊዝድሮ ሲጸድቅ ከባላንሱ ላይ በትክክል እንዲቀነስ ተደረገ
                     cursor.execute('UPDATE users SET balance = balance - ? WHERE username = ?', (amount, username))
                     cursor.execute("UPDATE withdrawals SET status = 'Approved' WHERE id = ?", (req_id,))
                     conn.commit()
