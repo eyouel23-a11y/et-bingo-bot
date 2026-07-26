@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ET Bingo - Rooms</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: #fff; margin: 0; padding: 15px; text-align: center; }
+        .container { max-width: 500px; margin: auto; }
+        .room-card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        .room-info { text-align: left; }
+        .btn { background: #4CAF50; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .back-btn { background: #444; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/account" class="back-btn">⬅️ ወደ አካውንት ተመለስ</a>
+        <h2>🎲 የጨዋታ ክፍሎች (Rooms)</h2>
+        <div id="rooms-list">መረጃ በመጫን ላይ...</div>
+    </div>
+
+    <script>
+        const phone = localStorage.getItem('bingo_phone');
+        if(!phone) window.location.href = '/';
+
+        function loadRooms() {
+            fetch('/api/rooms')
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    const listDiv = document.getElementById('rooms-list');
+                    listDiv.innerHTML = '';
+                    data.rooms.forEach(r => {
+                        listDiv.innerHTML += `
+                            <div class="room-card">
+                                <div class="room-info">
+                                    <b>${r.name}</b><br>
+                                    <span style="font-size:13px; color:#aaa;">ተጫዋቾች: ${r.current_players}/${r.max_players}</span>
+                                </div>
+                                <button class="btn" onclick="joinRoom('${r.id}')">ጆይን (Join)</button>
+                            </div>
+                        `;
+                    });
+                }
+            });
+        }
+
+        function joinRoom(roomId) {
+            fetch('/api/join_room', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({phone: phone, room_id: roomId})
+            }).then(res => res.json()).then(data => {
+                if(data.success) {
+                    localStorage.setItem('active_room', roomId);
+                    window.location.href = '/game';
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        loadRooms();
+        setInterval(loadRooms, 3000); // auto refresh rooms
+    </script>
+</body>
+</html>

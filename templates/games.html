@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ET Bingo - Play</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: #fff; margin: 0; padding: 10px; text-align: center; }
+        .card { background: #1e1e1e; padding: 12px; border-radius: 12px; max-width: 380px; margin: auto; }
+        .ball-display { background: #ff9800; color: black; font-size: 28px; font-weight: bold; padding: 15px; border-radius: 50%; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; margin: 10px auto; box-shadow: 0 0 15px rgba(255,152,0,0.5); }
+        .bingo-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 15px 0; }
+        .bingo-cell { background: #2a2a2a; border: 1px solid #444; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 15px; border-radius: 6px; cursor: pointer; color: #a0c4ff; }
+        .bingo-cell.marked { background: #4CAF50; color: white; }
+        .btn { background: #ff9800; color: black; border: none; padding: 12px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        .history-box { font-size: 13px; color: #aaa; margin: 5px 0; min-height: 20px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h3 id="room-title">ጨዋታ በመጫን ላይ...</h3>
+        <div id="wait-section">
+            <p id="wait-text">ተጫዋቾችን በመጠባበቅ ላይ...</p>
+        </div>
+
+        <div id="play-section" style="display:none;">
+            <div class="history-box">የተጠራች የመጨረሻ ኳስ:</div>
+            <div class="ball-display" id="current-ball">-</div>
+            <div class="history-box" id="ball-history">ቀደም ሲል የተጠሩ: የሉም</div>
+
+            <h4 style="margin:5px 0;">የቢንጎ ካርድዎ</h4>
+            <div class="bingo-board" id="board"></div>
+            <button class="btn" onclick="claimBingo()">🎉 BINGO አውራ!</button>
+        </div>
+    </div>
+
+    <script>
+        const phone = localStorage.getItem('bingo_phone');
+        const roomId = localStorage.getItem('active_room');
+        if(!phone || !roomId) window.location.href = '/rooms';
+
+        let currentCalledNumber = null;
+        let calledBallsList = [];
+
+        function checkStatus() {
+            fetch('/api/room_status?room_id=' + roomId)
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    document.getElementById('room-title').innerText = `ክፍል ተቀላቅለዋል (${data.current_players}/${data.max_players} ሰው)`;
+                    if(data.status === 'started') {
+                        document.getElementById('wait-section').style.display = 'none';
+                        document.getElementById('play-section').style.display = 'block';
+
+                        // Simulate random calling if game started and no ball called yet
+                        if(calledBallsList.length === 0) {
+                            startSimulatedCaller();
+                        }
+                    } else {
+                        document.getElementById('wait-text').innerText = `ተጫዋቾችን በመጠባበቅ ላይ... (${data.current_players}/${data.max_players})`;
+                    }
+                }
+            });
+        }
+
+        let boardNumbers = [];
+        function buildBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            boardNumbers = [];
+            for(let i=1; i<=25; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'bingo-cell';
+                let num = i === 13 ? 'FREE' : Math.floor(Math.random() * 75) + 1;
+                cell.innerText = num;
+                boardNumbers.push({num: num, marked: i === 13});
+                if(i === 13) cell.classList.add('marked');
+
+                cell.onclick = () => {
+                    if(i === 13) return; // free cell
+                    // Rule check: Can only mark if it matches the current called number
+                    if(num === currentCalledNumber || cell.classList.contains('marked')) {
+                        cell.classList.toggle('marked');
+                        boardNumbers[i-1].marked = cell.classList.contains('marked');
+                    } else {
+                        alert('ይህ ቁጥር አሁን አልተጠራም! የተጠራውን ቁጥር ብቻ መምረጥ ይችላሉ።');
+                    }
+                };
+                board.appendChild(cell);
+            }
+        }
+
+        function startSimulatedCaller() {
+            buildBoard();
+            setInterval(() => {
+                let randomNum = Math.floor(Math.random() * 75) + 1;
+                currentCalledNumber = randomNum;
+                calledBallsList.unshift(randomNum);
+                if(calledBallsList.length > 5) calledBallsList.pop();
+
+                document.getElementById('current-ball').innerText = randomNum;
+                document.getElementById('ball-history').innerText = 'ቀደም ሲል የተጠሩ: ' + calledBallsList.join(', ');
+            }, 6000); // every 6 seconds call a number
+        }
+
+        function claimBingo() {
+            fetch('/api/claim_win', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({phone: phone, room_id: roomId})
+            }).then(res => res.json()).then(data => {
+                alert(data.message);
+                if(data.success) {
+                    window.location.href = '/account';
+                }
+            });
+        }
+
+        checkStatus();
+        setInterval(checkStatus, 3000);
+    </script>
+</body>
+</html>

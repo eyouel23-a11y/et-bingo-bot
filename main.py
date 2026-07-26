@@ -1,315 +1,256 @@
 import os
-import random
-import time
-import sqlite3
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, jsonify, request
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-def init_db():
-    conn = sqlite3.connect('bingo.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (telegram_id INTEGER PRIMARY KEY, name TEXT, phone TEXT, balance REAL DEFAULT 0.0)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS game_history 
-                 (game_id INTEGER PRIMARY KEY AUTOINCREMENT, winner_name TEXT, winning_number TEXT, pattern_type TEXT, prize_amount REAL DEFAULT 0.0, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
-    conn.commit()
-    conn.close()
+# Upload Folder Configuration for Telebirr Screenshots
+UPLOAD_FOLDER = 'static/uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
-init_db()
+# --- IN-MEMORY DATABASE ---
+users = {}            # phone -> {phone, name, balance}
+deposit_requests = [] # [{id, phone, name, amount, proof, status}]
+withdrawal_requests = [] # [{id, phone, name, amount, status}]
+game_history = []     # [{game_id, room_name, winner_name, winner_phone, total_pool, prize, house_cut}]
 
-game_id_counter = 1001
-joined_players = set() # ለተዘጋጀው ጨዋታ ክፍያ የፈጸሙ ተጫዋቾች ዝርዝር (TG ID)
+# 12 Rooms Structure (3 Price Tiers x 4 Capacities)
+rooms = {}
+prices = [20, 40, 100]
+capacities = [5, 8, 10, 15]
 
-game_state = {
-    "game_id": game_id_counter,
-    "status": "waiting",
-    "called_numbers": [],
-    "winner": None,
-    "winning_number": None,
-    "entry_fee": 20.0,
-    "pattern": "any_line",
-    "last_call_time": 0
-}
-
-ALL_NUMBERS = list(range(1, 76))
-
-def get_bingo_letter(num):
-    if 1 <= num <= 15: return f"B-{num}"
-    elif 16 <= num <= 30: return f"I-{num}"
-    elif 31 <= num <= 45: return f"N-{num}"
-    elif 46 <= num <= 60: return f"G-{num}"
-    elif 61 <= num <= 75: return f"O-{num}"
-    return str(num)
-
-def calculate_prize():
-    total_collected = len(joined_players) * game_state["entry_fee"]
-    prize = total_collected * 0.75 # 75% ለተጫዋቹ
-    return round(total_collected, 2), round(prize, 2)
+for price in prices:
+    for cap in capacities:
+        room_id = f"room_{price}_{cap}"
+        rooms[room_id] = {
+            "id": room_id,
+            "name": f"ባለ {price} ብር ({cap} ሰው)",
+            "entry_fee": price,
+            "max_players": cap,
+            "players": [],
+            "status": "waiting"
+        }
 
 @app.route('/')
-def home():
+def index():
     return render_template('index.html')
 
+@app.route('/account')
+def account():
+    return render_template('account.html')
+
+@app.route('/rooms')
+def rooms_page():
+    return render_template('rooms.html')
+
+@app.route('/game')
+def game_page():
+    return render_template('game.html')
+
 @app.route('/admin')
-def admin():
+def admin_page():
     return render_template('admin.html')
 
-@app.route('/admin/users')
-def admin_users():
-    return render_template('admin_users.html')
-
-@app.route('/admin/history')
-def admin_history():
-    return render_template('admin_history.html')
-
-@app.route('/api/check_user', methods=['POST'])
-def check_user():
-    data = request.json
-    tg_id = data.get('telegram_id')
-
-    conn = sqlite3.connect('bingo.db')
-    c = conn.cursor()
-    c.execute("SELECT telegram_id, name, phone, balance FROM users WHERE telegram_id = ?", (tg_id,))
-    user = c.fetchone()
-    conn.close()
-
-    if user:
-        return jsonify({
-            "registered": True, 
-            "name": user[1], 
-            "phone": user[2], 
-            "balance": user[3],
-            "entry_fee": game_state["entry_fee"],
-            "has_joined": tg_id in joined_players
-        })
-    return jsonify({"registered": False, "entry_fee": game_state["entry_fee"]})
+# --- API ENDPOINTS ---
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    data = request.json
-    tg_id = data.get('telegram_id')
+    data = request.json or {}
     name = data.get('name')
     phone = data.get('phone')
+    if not phone or not name:
+        return jsonify({"success": False, "message": "ስም እና ስልክ ቁጥር ያስገቡ!"})
 
-    conn = sqlite3.connect('bingo.db')
-    c = conn.cursor()
-    try:
-        c.execute("INSERT INTO users (telegram_id, name, phone, balance) VALUES (?, ?, ?, 0.0)", (tg_id, name, phone))
-        conn.commit()
-        conn.close()
-        return jsonify({"status": "success", "name": name, "balance": 0.0})
-    except Exception:
-        conn.close()
-        return jsonify({"status": "error", "message": "ቀድመው ተመዝግበዋል!"}), 400
+    if phone not in users:
+        users[phone] = {"phone": phone, "name": name, "balance": 0.0}
+    else:
+        users[phone]["name"] = name
 
-@app.route('/api/join_game', methods=['POST'])
-def join_game():
-    global joined_players
-    data = request.json
-    tg_id = data.get('telegram_id')
+    return jsonify({"success": True, "balance": users[phone]["balance"]})
 
-    if game_state["status"] != "waiting":
-        return jsonify({"status": "error", "message": "ጨዋታው ተጀምሯል! እባክዎ ቀጣዩን ጨዋታ ይጠብቁ።"})
+@app.route('/api/get_user', methods=['GET'])
+def get_user():
+    phone = request.args.get('phone')
+    if phone in users:
+        return jsonify({"success": True, "user": users[phone]})
+    return jsonify({"success": False})
 
-    conn = sqlite3.connect('bingo.db')
-    c = conn.cursor()
-    c.execute("SELECT balance FROM users WHERE telegram_id = ?", (tg_id,))
-    user = c.fetchone()
+@app.route('/api/deposit', methods=['POST'])
+def deposit():
+    phone = request.form.get('phone')
+    amount = float(request.form.get('amount', 0))
 
-    fee = game_state["entry_fee"]
-    if not user or user[0] < fee:
-        conn.close()
-        return jsonify({"status": "error", "message": f"❌ በቂ ባላንስ የለዎትም! መደቡ {fee} ETB ነው።"})
+    if phone not in users:
+        return jsonify({"success": False, "message": "ተጠቃሚው አልተገኘም!"})
 
-    if tg_id in joined_players:
-        conn.close()
-        return jsonify({"status": "error", "message": "አስቀድመው ተመዝግበዋል!"})
+    proof_filename = "default.jpg"
+    if 'proof' in request.files:
+        file = request.files['proof']
+        if file.filename != '':
+            filename = secure_filename(file.filename)
+            # Make unique filename using phone and length
+            proof_filename = f"{phone}_{len(deposit_requests)}_{filename}"
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], proof_filename))
 
-    c.execute("UPDATE users SET balance = balance - ? WHERE telegram_id = ?", (fee, tg_id))
-    conn.commit()
-    conn.close()
-
-    joined_players.add(tg_id)
-    return jsonify({"status": "success", "message": "በጨዋታው ተሳታፊ ሆነዋል!"})
-
-@app.route('/api/admin/data', methods=['GET'])
-def get_admin_data():
-    conn = sqlite3.connect('bingo.db')
-    c = conn.cursor()
-    c.execute("SELECT telegram_id, name, phone, balance FROM users")
-    users = c.fetchall()
-
-    c.execute("SELECT game_id, winner_name, winning_number, pattern_type, timestamp FROM game_history ORDER BY game_id DESC LIMIT 20")
-    history = c.fetchall()
-    conn.close()
-
-    total_pool, prize = calculate_prize()
-
-    user_list = [{"telegram_id": u[0], "name": u[1], "phone": u[2], "balance": u[3]} for u in users]
-    history_list = [{"game_id": h[0], "winner": h[1], "winning_number": h[2], "pattern": h[3], "time": h[4]} for h in history]
-
-    return jsonify({
-        "users": user_list, 
-        "history": history_list,
-        "game_state": game_state,
-        "joined_count": len(joined_players),
-        "total_pool": total_pool,
-        "prize_amount": prize
+    req_id = len(deposit_requests) + 1
+    deposit_requests.append({
+        "id": req_id,
+        "phone": phone,
+        "name": users[phone]["name"],
+        "amount": amount,
+        "proof": proof_filename,
+        "status": "pending"
     })
+    return jsonify({"success": True, "message": "የዲፖዚት ጥያቄዎ እና ስክሪንሾቱ በአግባቡ ተልኳል! አድሚን ሲያረጋግጠው አካውንትዎ ላይ ይገባል።"})
 
-@app.route('/api/admin/users', methods=['GET'])
-def get_admin_users():
-    conn = sqlite3.connect('bingo.db')
-    c = conn.cursor()
-    c.execute("SELECT telegram_id, name, phone, balance FROM users")
-    users = c.fetchall()
-    conn.close()
-
-    user_list = [{"telegram_id": u[0], "name": u[1], "phone": u[2], "balance": u[3]} for u in users]
-    return jsonify({"users": user_list})
-
-@app.route('/api/admin/update_balance', methods=['POST'])
-def update_balance():
-    data = request.json
-    tg_id = data.get('telegram_id')
+@app.route('/api/withdraw', methods=['POST'])
+def withdraw():
+    data = request.json or {}
+    phone = data.get('phone')
     amount = float(data.get('amount', 0))
 
-    conn = sqlite3.connect('bingo.db')
-    c = conn.cursor()
-    c.execute("UPDATE users SET balance = balance + ? WHERE telegram_id = ?", (amount, tg_id))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "success"})
+    if phone not in users:
+        return jsonify({"success": False, "message": "ተጠቃሚው አልተገኘም!"})
 
-@app.route('/api/game_status', methods=['GET'])
-def get_game_status():
-    global game_state
-    if game_state["status"] == "running":
-        current_time = time.time()
-        if current_time - game_state["last_call_time"] >= 3:
-            called_raw = [int(x.split('-')[1]) for x in game_state["called_numbers"]]
-            remaining = [n for n in ALL_NUMBERS if n not in called_raw]
-            if remaining:
-                next_num = random.choice(remaining)
-                formatted_num = get_bingo_letter(next_num)
-                game_state["called_numbers"].append(formatted_num)
-                game_state["last_call_time"] = current_time
-            else:
-                game_state["status"] = "ended"
+    user = users[phone]
+    if amount <= 0 or amount > user["balance"]:
+        return jsonify({"success": False, "message": "ያስገቡት የገንዘብ መጠን ከባላንሶ በላይ ነው ወይም ትክክለኛ አይደለም!"})
 
-    total_pool, prize = calculate_prize()
+    req_id = len(withdrawal_requests) + 1
+    withdrawal_requests.append({
+        "id": req_id,
+        "phone": phone,
+        "name": user["name"],
+        "amount": amount,
+        "status": "pending"
+    })
+    return jsonify({"success": True, "message": "የዊዝድሮዋል ጥያቄዎ ተልኳል!"})
 
-    res_data = dict(game_state)
-    res_data["joined_players"] = list(joined_players)
-    res_data["joined_count"] = len(joined_players)
-    res_data["total_pool"] = total_pool
-    res_data["prize_amount"] = prize
-    return jsonify(res_data)
+@app.route('/api/rooms', methods=['GET'])
+def get_rooms():
+    room_list = []
+    for r_id, r_data in rooms.items():
+        room_list.append({
+            "id": r_data["id"],
+            "name": r_data["name"],
+            "entry_fee": r_data["entry_fee"],
+            "max_players": r_data["max_players"],
+            "current_players": len(r_data["players"]),
+            "status": r_data["status"]
+        })
+    return jsonify({"success": True, "rooms": room_list})
 
-@app.route('/api/admin_control', methods=['POST'])
-def admin_control():
-    global game_state, game_id_counter, joined_players
-    data = request.json
-    action = data.get('action')
+@app.route('/api/join_room', methods=['POST'])
+def join_room():
+    data = request.json or {}
+    phone = data.get('phone')
+    room_id = data.get('room_id')
 
-    if action == 'start':
-        if game_state["status"] in ["waiting", "paused"]:
-            fee = float(data.get('entry_fee', 20.0))
-            pattern = data.get('pattern', 'any_line')
-            game_state["entry_fee"] = fee
-            game_state["pattern"] = pattern
-            game_state["status"] = "running"
-            game_state["last_call_time"] = time.time()
+    user = users.get(phone)
+    room = rooms.get(room_id)
 
-    elif action == 'pause':
-        game_state["status"] = "paused"
-    elif action == 'reset':
-        game_id_counter += 1
-        joined_players.clear()
-        game_state = {
-            "game_id": game_id_counter,
-            "status": "waiting",
-            "called_numbers": [],
-            "winner": None,
-            "winning_number": None,
-            "entry_fee": float(data.get('entry_fee', 20.0)),
-            "pattern": data.get('pattern', 'any_line'),
-            "last_call_time": 0
-        }
+    if not user or not room:
+        return jsonify({"success": False, "message": "ተጠቃሚው ወይም ክፍሉ አልተገኘም!"})
 
-    return jsonify({"status": "success", "game_state": game_state})
+    if room["status"] != "waiting":
+        return jsonify({"success": False, "message": "ጨዋታው უკვე ጀምሯል ወይም አልቋል!"})
 
-def verify_bingo(board, marked_indices, called_numbers, pattern):
-    called_set = set()
-    for call in called_numbers:
-        val = call.split('-')[1] if '-' in call else call
-        called_set.add(val)
+    if any(p["phone"] == phone for p in room["players"]):
+        return jsonify({"success": True, "room": room})
 
-    for idx in marked_indices:
-        val = str(board[idx])
-        if val != "FREE" and val not in called_set:
-            return False
+    if user["balance"] < room["entry_fee"]:
+        return jsonify({"success": False, "message": f"በቂ ባላንስ የለዎትም! (የሚጠበቀው: {room['entry_fee']} ብር)"})
 
-    lines = []
-    for r in range(5):
-        lines.append([r*5 + c for c in range(5)])
-    for c in range(5):
-        lines.append([r*5 + c for r in range(5)])
-    lines.append([0, 6, 12, 18, 24])
-    lines.append([4, 8, 12, 16, 20])
+    user["balance"] -= room["entry_fee"]
+    room["players"].append({"phone": phone, "name": user["name"]})
 
-    completed_lines = 0
-    for line in lines:
-        if all(idx in marked_indices for idx in line):
-            completed_lines += 1
+    if len(room["players"]) >= room["max_players"]:
+        room["status"] = "started"
 
-    if pattern == "any_line" and completed_lines >= 1:
-        return True
-    elif pattern == "two_lines" and completed_lines >= 2:
-        return True
-    elif pattern == "full_house" and len(marked_indices) == 25:
-        return True
+    return jsonify({"success": True, "balance": user["balance"], "room": room})
 
-    return False
+@app.route('/api/room_status', methods=['GET'])
+def room_status():
+    room_id = request.args.get('room_id')
+    room = rooms.get(room_id)
+    if not room:
+        return jsonify({"success": False})
+    return jsonify({
+        "success": True,
+        "current_players": len(room["players"]),
+        "max_players": room["max_players"],
+        "status": room["status"],
+        "players": room["players"]
+    })
 
-@app.route('/api/claim_bingo', methods=['POST'])
-def claim_bingo():
-    global game_state
-    data = request.json
-    player_name = data.get('player_name', 'Player')
-    tg_id = data.get('telegram_id')
-    board = data.get('board', [])
-    marked_indices = data.get('marked_indices', [])
+@app.route('/api/claim_win', methods=['POST'])
+def claim_win():
+    data = request.json or {}
+    phone = data.get('phone')
+    room_id = data.get('room_id')
 
-    if tg_id not in joined_players:
-        return jsonify({"status": "invalid", "message": "❌ በጨዋታው አልተመዘገቡም!"})
+    user = users.get(phone)
+    room = rooms.get(room_id)
 
-    if game_state["status"] == "running" and len(game_state["called_numbers"]) > 0:
-        is_valid = verify_bingo(board, marked_indices, game_state["called_numbers"], game_state["pattern"])
+    if not user or not room:
+        return jsonify({"success": False, "message": "ስህተት ተፈጥሯል!"})
 
-        if is_valid:
-            last_num = game_state["called_numbers"][-1]
-            total_pool, prize = calculate_prize()
+    total_pool = room["entry_fee"] * len(room["players"])
+    prize = total_pool * 0.75
+    house_cut = total_pool * 0.25
 
-            game_state["status"] = "ended"
-            game_state["winner"] = player_name
-            game_state["winning_number"] = last_num
+    user["balance"] += prize
 
-            # አሸናፊውን አካውንት ላይ 75% ሽልማቱን በቀጥታ ይጨምራል!
-            conn = sqlite3.connect('bingo.db')
-            c = conn.cursor()
-            c.execute("UPDATE users SET balance = balance + ? WHERE telegram_id = ?", (prize, tg_id))
-            c.execute("INSERT INTO game_history (game_id, winner_name, winning_number, pattern_type, prize_amount) VALUES (?, ?, ?, ?, ?)",
-                      (game_state["game_id"], player_name, last_num, game_state["pattern"], prize))
-            conn.commit()
-            conn.close()
+    game_id = f"GM-{len(game_history) + 101}"
+    game_history.append({
+        "game_id": game_id,
+        "room_name": room["name"],
+        "winner_name": user["name"],
+        "winner_phone": phone,
+        "total_pool": total_pool,
+        "prize": prize,
+        "house_cut": house_cut
+    })
 
-            return jsonify({"status": "valid", "winner": player_name, "winning_number": last_num, "prize": prize})
-        else:
-            return jsonify({"status": "invalid", "message": "❌ ቢንጎ አልሰራም! የተመረጡት መስመሮች አልተሟሉም።"})
+    room["players"] = []
+    room["status"] = "waiting"
 
-    return jsonify({"status": "invalid", "message": "ጨዋታው አልተጀመረም!"})
+    return jsonify({"success": True, "prize": prize, "balance": user["balance"], "message": f"እንኳን ደስ አለዎት! {prize} ብር አሸንፈዋል!"})
+
+# --- ADMIN API ENDPOINTS ---
+@app.route('/api/admin/data', methods=['GET'])
+def admin_data():
+    return jsonify({
+        "users": list(users.values()),
+        "deposits": deposit_requests,
+        "withdrawals": withdrawal_requests,
+        "history": game_history
+    })
+
+@app.route('/api/admin/approve_deposit', methods=['POST'])
+def approve_deposit():
+    data = request.json or {}
+    req_id = data.get('req_id')
+    for req in deposit_requests:
+        if req["id"] == req_id and req["status"] == "pending":
+            req["status"] = "approved"
+            phone = req["phone"]
+            if phone in users:
+                users[phone]["balance"] += req["amount"]
+            return jsonify({"success": True, "message": "ዲፖዚቱ ተጸድቆ አካውንት ላይ ገብቷል!"})
+    return jsonify({"success": False, "message": "ጥያቄው አልተገኘም!"})
+
+@app.route('/api/admin/approve_withdraw', methods=['POST'])
+def approve_withdraw():
+    data = request.json or {}
+    req_id = data.get('req_id')
+    for req in withdrawal_requests:
+        if req["id"] == req_id and req["status"] == "pending":
+            req["status"] = "approved"
+            return jsonify({"success": True, "message": "ዊዝድሮዋል ጥያቄው ተጸድቋል!"})
+    return jsonify({"success": False, "message": "ጥያቄው አልተገኘም!"})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

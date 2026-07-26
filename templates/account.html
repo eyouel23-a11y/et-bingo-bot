@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ET Bingo - Account</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: #fff; margin: 0; padding: 15px; text-align: center; }
+        .card { background: #1e1e1e; padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); max-width: 400px; margin-left: auto; margin-right: auto; }
+        .btn { background: #2481cc; color: white; border: none; padding: 12px; font-size: 15px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; text-decoration: none; display: inline-block; box-sizing: border-box; }
+        .btn-success { background: #4CAF50; }
+        .btn-danger { background: #e53935; }
+        input, select { width: 90%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #444; background: #121212; color: white; font-size: 15px; box-sizing: border-box; }
+        .balance-box { font-size: 24px; color: #ff9800; font-weight: bold; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h3>👤 የተጠቃሚ አካውንት</h3>
+        <p id="user-info" style="color: #ccc;"></p>
+        <div class="balance-box">💰 <span id="balance">0.00</span> ETB</div>
+        <a href="/rooms" class="btn btn-success">🎮 ወደ ጌም መግቢያ (Join Game)</a>
+    </div>
+
+    <div class="card">
+        <h3>📲 ቴሌብር ዲፖዚት (Deposit)</h3>
+        <p style="font-size: 13px; color: #aaa; text-align: left; margin-left: 5%;">ብር ለማስገባት ወደ <b>0982289449</b> ያስተላልፉና የስክሪንሾት ፎቶ ይላኩ።</p>
+        <input type="number" id="dep-amount" placeholder="የብር መጠን (ETB)">
+        <input type="file" id="dep-file" accept="image/*" style="padding: 8px;">
+        <button class="btn" onclick="sendDeposit()">ዲፖዚት ላክ</button>
+    </div>
+
+    <div class="card">
+        <h3>💸 ዊዝድሮዋል (Withdrawal)</h3>
+        <input type="number" id="wit-amount" placeholder="የሚወጣው የብር መጠን">
+        <button class="btn btn-danger" onclick="sendWithdrawal()">ገንዘብ አውጣ (Withdraw)</button>
+    </div>
+
+    <script>
+        const phone = localStorage.getItem('bingo_phone');
+        if(!phone) window.location.href = '/';
+
+        fetch('/api/get_user?phone=' + encodeURIComponent(phone))
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                document.getElementById('user-info').innerText = `${data.user.name} (${data.user.phone})`;
+                document.getElementById('balance').innerText = data.user.balance.toFixed(2);
+            } else {
+                window.location.href = '/';
+            }
+        });
+
+        function sendDeposit() {
+            const amount = document.getElementById('dep-amount').value;
+            const fileInput = document.getElementById('dep-file');
+            if(!amount) return alert('እባክዎ የብር መጠን ያስገቡ!');
+            if(fileInput.files.length === 0) return alert('እባክዎ የቴሌብር ስክሪንሾት ፎቶ ይምረጡ!');
+
+            const formData = new FormData();
+            formData.append('phone', phone);
+            formData.append('amount', amount);
+            formData.append('proof', fileInput.files[0]);
+
+            fetch('/api/deposit', {
+                method: 'POST',
+                body: formData
+            }).then(res => res.json()).then(data => {
+                alert(data.message);
+                if(data.success) {
+                    document.getElementById('dep-amount').value = '';
+                    document.getElementById('dep-file').value = '';
+                }
+            });
+        }
+
+        function sendWithdrawal() {
+            const amount = document.getElementById('wit-amount').value;
+            if(!amount) return alert('እባክዎ መጠን ያስገቡ!');
+
+            fetch('/api/withdraw', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({phone: phone, amount: amount})
+            }).then(res => res.json()).then(data => {
+                alert(data.message);
+                if(data.success) location.reload();
+            });
+        }
+    </script>
+</body>
+</html>
